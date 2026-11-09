@@ -1,0 +1,10 @@
+packages:
+  - apps/*
+  - packages/*
+
+# Expo pulls a newer react-dom than react; React requires both to match exactly.
+overrides:
+  react-dom: 19.3.0
+
+onlyBuiltDependencies:
+  - esbuild

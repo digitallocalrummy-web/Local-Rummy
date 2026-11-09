@@ -1,0 +1,32 @@
+/* Seats for 1–10 players and the player picker */
+.oseat{position:absolute;width:96px;height:70px;border:2px solid var(--gold3);border-radius:12px;background:rgba(6,40,24,.93);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;box-shadow:0 6px 14px rgba(0,0,0,.35);transition:box-shadow .3s,border-color .3s;z-index:3;animation:seatIn .35s ease both}
+@keyframes seatIn{from{opacity:0;transform:scale(.85)}to{opacity:1;transform:none}}
+.oseat.active{border-color:#F5C542;box-shadow:0 0 0 3px rgba(245,197,66,.35),0 0 26px rgba(245,197,66,.55),0 6px 14px rgba(0,0,0,.4)}
+.oseat .otop{display:flex;align-items:center;gap:7px}
+.oseat .badge{right:-7px;bottom:-2px;min-width:18px;height:16px;font-size:10px}
+.oseat .sname{font-size:11px;line-height:1.15}
+.oseat .sstat{font-size:8px;height:10px;letter-spacing:1px;white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis}
+.lastc{width:22px;height:31px;display:flex;align-items:center;justify-content:center}
+.mback{display:block;width:20px;height:28px;border-radius:3px;background:#fff;padding:2px}
+.mback:after{content:"";display:block;width:100%;height:100%;border-radius:2px;background:var(--back) repeating-linear-gradient(45deg,rgba(255,215,140,.35) 0 1px,transparent 1px 4px)}
+
+/* right rail: table info moves off the felt so seats can use the top edge */
+#modepill{left:836px;top:74px;width:110px;height:auto;padding:6px 10px;border-radius:12px;flex-direction:column;align-items:flex-start;gap:2px;letter-spacing:.6px}
+#modepill b{font-size:11px;color:#fff;font-weight:800}
+#modepill span{font-size:9px;color:var(--gold2);white-space:nowrap;letter-spacing:.3px}
+.ptsbox{left:836px;top:134px;width:110px}
+.ptsbox span{letter-spacing:.8px;white-space:nowrap}
+#emoteBtn{left:852px!important}
+
+/* result list scrolls when the table is large */
+#rrows{max-height:150px;overflow-y:auto;scrollbar-width:thin}
+.rrow.sm{height:28px;font-size:12px}
+
+/* player picker */
+.pchips{display:flex;gap:4px}
+.pchips button{width:37px;height:40px;border-radius:10px;border:1.5px solid rgba(255,255,255,.18);background:rgba(255,255,255,.04);color:#C3CDE2;font-weight:800;font-size:14px;transition:all .15s}
+.pchips button.on{border-color:var(--gold);background:rgba(232,198,106,.2);color:var(--gold2);transform:translateY(-2px)}
+.seg.num button{padding:0;font-size:12px}
+.prow{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;min-height:32px;align-items:center}
+.prow .av{animation:seatIn .25s ease both}
+.pnote{margin-top:10px;font-size:12px;color:var(--mute)}

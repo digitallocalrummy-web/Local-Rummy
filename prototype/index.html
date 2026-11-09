@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="theme-color" content="#0B0906">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Local Rummy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800&family=Manrope:wght@500;600;700;800&family=Libre+Baskerville:wght@700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 52 30%27%3E%3Cpath d=%27M3 27 L7 7 L18 17 L26 2 L34 17 L45 7 L49 27 Z%27 fill=%27%23E8C66A%27/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="seats.css">
+<link rel="preload" as="image" href="img/hostess.avif">
+</head>
+<body>
+<div id="stage">
+
+  <!-- SPLASH -->
+  <section class="screen on" id="splash" aria-label="Local Rummy">
+    <img class="hero" src="img/hostess.avif" alt="Local Rummy hostess beside an emerald card table under a gold chandelier">
+    <div class="fadeR"></div><div class="fadeB"></div>
+    <div class="brand">
+      <svg class="crown" viewBox="0 0 52 30" aria-hidden="true"><path d="M3 27 L7 7 L18 17 L26 2 L34 17 L45 7 L49 27 Z" fill="#E8C66A" stroke="#8a6a2a" stroke-width="1.5"/><circle cx="26" cy="2.5" r="2.5" fill="#F5DC94"/><circle cx="7" cy="7" r="2" fill="#F5DC94"/><circle cx="45" cy="7" r="2" fill="#F5DC94"/></svg>
+      <h1 class="logo">LOCAL<br>RUMMY</h1>
+      <div class="tag"><i></i>INDIAN 13 CARD RUMMY<i></i></div>
+      <div class="loadbar"><b id="loadb"></b></div>
+      <div class="loadtxt" id="loadt">SHUFFLING THE DECK · 0%</div>
+      <button class="btn-gold" id="enter">TAP TO PLAY</button>
+    </div>
+  </section>
+
+  <!-- LOBBY -->
+  <section class="screen" id="lobby" aria-label="Lobby">
+    <img class="bg" src="img/table.webp" alt="">
+    <div class="dim"></div>
+    <div class="lpanel">
+      <nav class="lnav" aria-label="Game types">
+        <div class="brandmini"><svg width="26" height="16" viewBox="0 0 52 30" aria-hidden="true"><path d="M3 27 L7 7 L18 17 L26 2 L34 17 L45 7 L49 27 Z" fill="#E8C66A"/></svg>LOCAL RUMMY</div>
+        <button class="tab on" data-tab="0"><i></i>PLAY FOR FUN</button>
+        <button class="tab" data-tab="1"><i></i>QUICK PLAY</button>
+        <button class="tab" data-tab="2"><i></i>PRACTICE</button>
+        <button class="tab" data-tab="3"><i></i>PLAY WITH FRIENDS</button>
+        <button class="me-mini" id="profileBtn">
+          <span class="av" style="width:34px;height:34px;background:#1F6B4A;font-size:12px">RV</span>
+          <span style="text-align:left"><b style="display:block;font-size:12px">Rohan V.</b><span style="font-size:10px;font-weight:700;color:var(--muteb)">Level 18 · Gold</span></span>
+        </button>
+      </nav>
+      <div class="lmain">
+        <div class="lhead">
+          <div><h2 id="lh">Choose a table</h2><p id="lp">Virtual chips only · No real money</p></div>
+          <div class="chips"><span class="chip"></span><b class="chipval">12,450</b><button class="plus" id="bonusBtn" aria-label="Collect daily bonus">+</button></div>
+          <button class="pill-ghost">ENG</button>
+          <button class="ib2" id="profileBtn2" aria-label="Profile"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></button>
+          <button class="ib2" data-go="settings" aria-label="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></svg></button>
+          <button class="ib2" data-go="splash" aria-label="Exit"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+        </div>
+        <div class="tabpane grid3 on" id="pane0"></div>
+        <div class="tabpane qgrid" id="pane1"></div>
+        <div class="tabpane grid3" id="pane2"></div>
+        <div class="tabpane fgrid" id="pane3"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- GAME -->
+  <section class="screen" id="game" aria-label="Rummy table">
+    <svg class="pattern" width="960" height="432" aria-hidden="true"><defs><pattern id="suits" width="56" height="56" patternUnits="userSpaceOnUse"><text x="6" y="22" font-size="16" fill="#0d2a1a">♦</text><text x="34" y="50" font-size="16" fill="#0d2a1a">♣</text><text x="34" y="22" font-size="14" fill="#0b2517">♠</text><text x="6" y="50" font-size="14" fill="#0b2517">♥</text></pattern></defs><rect width="960" height="432" fill="url(#suits)"/></svg>
+    <div class="felt"><div class="emb"></div></div>
+
+    <div id="seats"></div>
+
+    <div class="modepill" id="modepill"><b>POINTS</b><span>4 PLAYERS · 200</span></div>
+    <div class="ptsbox"><span>POINTS · DEALS</span><b>0<small style="color:var(--mute);font-size:12px">/80</small></b></div>
+    <button class="ibtn" id="emoteBtn" style="position:absolute;left:744px;top:26px" aria-label="Quick chat"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg></button>
+    <button class="ibtn" id="leaveBtn" style="position:absolute;left:900px;top:26px" aria-label="Leave table"><svg viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></button>
+
+    <div class="tray"><span class="lbl">DISCARDS · WHO THREW</span><div class="empty" id="trayEmpty">No cards thrown yet</div><div id="trayCards"></div></div>
+    <div class="banner" id="banner"><div><span class="av" id="bannerAv" style="background:#1F6B4A">RV</span><span id="bannerTxt">Shuffling the deck…</span></div></div>
+
+    <div class="deck" id="deck">
+      <div class="jokercard" id="jokerCard"></div>
+      <div class="stack" id="deckStack"></div>
+      <button class="card back top" id="deckTop" aria-label="Draw from closed deck"><span class="crest">R</span></button>
+      <span class="plabel" id="deckLabel">DECK</span>
+    </div>
+    <div class="openp" id="openp"><div class="slot"></div><div id="openCard"></div><span class="plabel">OPEN PILE</span></div>
+    <div class="dropzone" id="dropzone">DROP HERE TO DISCARD</div>
+
+    <div class="me">
+      <div class="avwrap"><svg class="ring" id="myRing" viewBox="0 0 52 52"><circle class="bg" cx="26" cy="26" r="24"/><circle class="fg" id="myRingFg" cx="26" cy="26" r="24" stroke-dasharray="150.8" stroke-dashoffset="0"/></svg><span class="av" style="width:42px;height:42px;background:#1F6B4A;font-size:14px;border-color:#FFF1C4">RV</span></div>
+      <b style="font-size:12px">Rohan (You)</b>
+      <div style="display:flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:rgba(0,0,0,.4)"><span class="chip" style="width:9px;height:9px;border-width:1.5px"></span><b class="chipval" style="font-size:10px;color:var(--gold2)">12,450</b></div>
+    </div>
+
+    <div id="hand"></div>
+    <div id="flyLayer"></div>
+
+    <div class="rcol">
+      <div style="display:flex;gap:8px">
+        <button class="tile" id="sortBtn"><svg viewBox="0 0 24 24"><path d="M3 16l4 4 4-4"/><path d="M7 20V4"/><path d="M21 8l-4-4-4 4"/><path d="M17 4v16"/></svg>SORT</button>
+        <button class="tile" id="groupBtn"><svg viewBox="0 0 24 24"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>GROUP</button>
+      </div>
+      <button class="btn-red" id="discardBtn" disabled>Discard</button>
+      <button class="btn-gold" id="declareBtn" style="padding:0" disabled>Declare</button>
+    </div>
+  </section>
+
+  <!-- RESULT -->
+  <section class="screen" id="result" aria-label="Result">
+    <canvas id="confetti" width="960" height="432"></canvas>
+    <div class="rhead">
+      <svg class="crown" viewBox="0 0 52 30" aria-hidden="true"><path d="M3 27 L7 7 L18 17 L26 2 L34 17 L45 7 L49 27 Z" fill="#E8C66A" stroke="#8a6a2a" stroke-width="1.5"/></svg>
+      <h1>YOU WIN</h1>
+      <span style="font-size:12px;font-weight:700;letter-spacing:3px;color:#CFC3A0" id="rsub">VALID DECLARATION · POINTS RUMMY</span>
+    </div>
+    <div class="rpanel">
+      <div style="flex:1;padding:12px 16px;display:flex;flex-direction:column;gap:4px">
+        <div class="rrow" style="background:none;height:20px;font-size:9px;font-weight:800;letter-spacing:1.6px;color:var(--mute);animation:none"><span>PLAYER</span><span>POINTS</span><span style="text-align:right">CHIPS</span></div>
+        <div id="rrows" style="display:flex;flex-direction:column;gap:4px"></div>
+      </div>
+      <div style="width:170px;border-left:1px solid rgba(232,198,106,.2);padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+        <span class="lbl" style="color:var(--mute)">GAME STATS</span>
+        <div class="stat"><span>Duration</span><b id="sDur">00:00</b></div>
+        <div class="stat"><span>Turns played</span><b id="sTurns">0</b></div>
+        <div class="stat"><span>Win streak</span><b>3</b></div>
+      </div>
+    </div>
+    <div class="rbtns"><button class="btn-line" style="height:46px;width:180px" data-go="lobby">Back to Lobby</button><button class="btn-gold" style="height:46px;width:180px" id="againBtn">Play Again</button></div>
+  </section>
+
+  <!-- SETTINGS -->
+  <section class="screen" id="settings" aria-label="Settings">
+    <img class="bg" src="img/table.webp" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">
+    <div style="position:absolute;inset:0;background:rgba(5,6,5,.7)"></div>
+    <div class="spanel">
+      <div style="display:flex;align-items:center;gap:12px">
+        <button class="ibtn" id="setBack" aria-label="Back"><svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg></button>
+        <h2 class="cin" style="margin:0;font-size:22px;letter-spacing:3px;color:#F2D27E">SETTINGS</h2>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;flex:1">
+        <div class="box">
+          <span class="lbl">AUDIO &amp; FEEL</span>
+          <div class="srow"><label for="vol">Sound</label><input id="vol" type="range" min="0" max="100" value="80"><b id="volv" style="width:30px;text-align:right;color:var(--gold2)">80</b></div>
+          <div class="srow"><label for="mus">Music</label><input id="mus" type="range" min="0" max="100" value="0"><b id="musv" style="width:30px;text-align:right;color:var(--gold2)">0</b></div>
+          <div class="srow"><span>Haptic feedback</span><button class="sw on" id="swHap" role="switch" aria-checked="true" aria-label="Haptic feedback"></button></div>
+          <div class="srow"><span>Fast card animations</span><button class="sw" id="swFast" role="switch" aria-checked="false" aria-label="Fast card animations"></button></div>
+        </div>
+        <div class="box">
+          <span class="lbl">TABLE THEME</span>
+          <div style="display:flex;gap:10px" id="tableSw"></div>
+          <span class="lbl" style="margin-top:4px">CARD BACK</span>
+          <div style="display:flex;gap:12px" id="backSw"></div>
+          <div style="margin-top:auto;display:flex;gap:10px">
+            <button class="btn-line" style="flex:1" id="howBtn">How to Play</button>
+            <button class="btn-line" style="flex:1;border-color:rgba(255,255,255,.25);color:#EEF1F8" id="aboutBtn">About</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div id="modal"><div class="mbox" role="dialog" aria-modal="true"><div class="mtitle"><h3 id="mT"></h3><button class="ibtn" id="mClose" aria-label="Close" style="width:36px;height:36px"><svg viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button></div><div class="mbody" id="mB"></div><div class="mbtns" id="mF"></div></div></div>
+</div>
+
+<div id="rotate"><svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="2"/><line x1="11" y1="18" x2="13" y2="18"/></svg><p>Rotate your phone to landscape to play</p></div>
+
+<script src="game.js"></script>
+</body>
+</html>

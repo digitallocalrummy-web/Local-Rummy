@@ -1,0 +1,21 @@
+{
+  "name": "local-rummy",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local Rummy: Indian 13-card rummy with virtual chips. Mobile app, admin panel and game server.",
+  "packageManager": "pnpm@10.28.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev:server": "pnpm --filter @local-rummy/server dev",
+    "dev:admin": "pnpm --filter @local-rummy/admin dev",
+    "dev:mobile": "pnpm --filter @local-rummy/mobile start",
+    "build": "pnpm -r --filter=!@local-rummy/mobile build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "db:up": "docker compose up -d db redis",
+    "db:migrate": "pnpm --filter @local-rummy/server db:migrate",
+    "db:seed": "pnpm --filter @local-rummy/server db:seed"
+  }
+}
