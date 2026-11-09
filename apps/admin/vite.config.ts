@@ -6,5 +6,5 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   base: process.env.ADMIN_BASE ?? '/',
-  server: { port: 5173, host: true, proxy: { '/api': 'http://localhost:4000' } },
+  server: { port: 5173, host: true, proxy: { '/api': 'http://127.0.0.1:4000' } },
 });
