@@ -2,7 +2,7 @@
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import { loadConfig } from './config';
-import { db, pool, schema } from './db';
+import { closeDb, db, schema } from './db';
 import { env } from './env';
 import { runMigrations } from './migrate';
 
@@ -26,7 +26,7 @@ async function main() {
     ]);
     console.log('Added starter banners');
   }
-  await pool.end();
+  await closeDb();
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

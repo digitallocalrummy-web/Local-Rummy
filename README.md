@@ -34,16 +34,19 @@ modified app cannot cheat.
 
 ## Run it on your computer
 
-Needs Node.js 22+, pnpm 10 (`npm i -g pnpm`) and PostgreSQL 16 (or Docker).
+Needs only **Node.js 22+**. The server uses a built-in test database (saved in `apps/server/.data`), so there is no Docker or PostgreSQL to install.
 
 ```bash
+npm install -g pnpm
 pnpm install
-docker compose up -d db                 # or use your own PostgreSQL
-cp apps/server/.env.example apps/server/.env   # then edit the secrets and admin login
-pnpm db:seed                            # creates tables, settings and the first super admin
-pnpm dev:server                         # API on http://localhost:4000
-pnpm dev:admin                          # admin on http://localhost:5173
+pnpm db:seed          # creates the tables, settings and the admin admin@localrummy.app / change-me-now
+pnpm dev:server       # terminal 1 · API on http://localhost:4000
+pnpm dev:admin        # terminal 2 · admin on http://localhost:5173
+pnpm simulate 4 50    # terminal 3 (optional) · plays a 4-player game with a 50-chip entry
 ```
+
+To use real PostgreSQL instead, copy `apps/server/.env.example` to `apps/server/.env` and set `DATABASE_URL=postgres://…`
+(`docker compose up -d db` starts one).
 
 Mobile app (on a phone on the same Wi-Fi):
 
@@ -72,6 +75,5 @@ See [deploy/DEPLOY.md](deploy/DEPLOY.md).
 ```bash
 pnpm test                          # rummy rules tests
 pnpm typecheck                     # all packages
-pnpm --filter @local-rummy/server exec tsx --env-file=.env src/simulate.ts 4 50
-                                   # plays a full 4-player game against the running server
+pnpm simulate 4 50                 # plays a full 4-player game against the running server
 ```

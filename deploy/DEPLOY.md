@@ -26,7 +26,7 @@ nano apps/server/.env
 
 In `apps/server/.env` set:
 
-- `DATABASE_URL=postgres://localrummy:a-strong-db-password@localhost:5432/localrummy`
+- `DATABASE_URL=postgres://localrummy:a-strong-db-password@localhost:5432/localrummy` (on the VPS always use real PostgreSQL, not the built-in `pglite:` test database)
 - `JWT_SECRET` and `ADMIN_JWT_SECRET`: two different long random strings (`openssl rand -hex 32`)
 - `CORS_ORIGINS=http://YOUR_VPS_IP` (or `https://yourdomain.com`), the address you open the admin panel from
 - `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD`: the first super admin. Change the password after the first sign-in by creating a new admin and removing the seed values.

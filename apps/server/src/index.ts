@@ -1,7 +1,7 @@
 import { Server } from 'socket.io';
 import { buildApp } from './app';
 import { loadConfig } from './config';
-import { pool } from './db';
+import { closeDb } from './db';
 import { env } from './env';
 import { attachSockets, refundOrphanedEntries } from './game/manager';
 import { runMigrations } from './migrate';
@@ -15,7 +15,7 @@ async function main() {
   attachSockets(io);
   await app.listen({ port: env.PORT, host: env.HOST });
   console.log(`Local Rummy server on http://${env.HOST}:${env.PORT}`);
-  const stop = async () => { io.close(); await app.close(); await pool.end(); process.exit(0); };
+  const stop = async () => { io.close(); await app.close(); await closeDb(); process.exit(0); };
   process.on('SIGINT', stop);
   process.on('SIGTERM', stop);
 }

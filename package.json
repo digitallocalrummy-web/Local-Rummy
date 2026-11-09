@@ -14,8 +14,8 @@
     "build": "pnpm -r --filter=!@local-rummy/mobile build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "db:up": "docker compose up -d db redis",
     "db:migrate": "pnpm --filter @local-rummy/server db:migrate",
-    "db:seed": "pnpm --filter @local-rummy/server db:seed"
+    "db:seed": "pnpm --filter @local-rummy/server db:seed",
+    "simulate": "pnpm --filter @local-rummy/server simulate"
   }
 }

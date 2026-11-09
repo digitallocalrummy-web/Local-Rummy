@@ -5,7 +5,7 @@ module.exports = {
     name: 'local-rummy-server',
     cwd: __dirname + '/../apps/server',
     script: 'dist/index.js',
-    node_args: '--env-file=.env',
+    env: { NODE_ENV: 'production' }, // reads apps/server/.env
     instances: 1, // game tables live in memory: keep ONE instance
     max_memory_restart: '600M',
     time: true,
