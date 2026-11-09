@@ -10,7 +10,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file=.env src/migrate.ts",
     "db:seed": "tsx --env-file=.env src/seed.ts",
-    "test": "node --import tsx --test src/**/*.test.ts",
+    "test": "DATABASE_URL=postgres://test JWT_SECRET=test-secret ADMIN_JWT_SECRET=test-secret node --import tsx --test src/**/*.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
