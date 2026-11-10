@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// Read apps/server/.env if it exists (Node 20.12+). Values already set in the environment win.
+// Read server/.env if it exists (Node 20.12+). Values already set in the environment win.
 try { process.loadEnvFile('.env'); } catch { /* no .env file: use the defaults below */ }
 
 const production = process.env.NODE_ENV === 'production';

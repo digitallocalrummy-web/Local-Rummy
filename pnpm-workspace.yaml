@@ -1,6 +1,8 @@
 packages:
-  - apps/*
-  - packages/*
+  - server
+  - admin-panel
+  - mobile-app
+  - shared/*
 
 # Expo pulls a newer react-dom than react; React requires both to match exactly.
 overrides:

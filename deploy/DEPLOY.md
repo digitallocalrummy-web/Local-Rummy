@@ -20,11 +20,11 @@ git clone https://github.com/<client-account>/Local-Rummy.git /opt/local-rummy
 cd /opt/local-rummy
 pnpm install
 POSTGRES_PASSWORD='a-strong-db-password' docker compose up -d db
-cp apps/server/.env.example apps/server/.env
-nano apps/server/.env
+cp server/.env.example server/.env
+nano server/.env
 ```
 
-In `apps/server/.env` set:
+In `server/.env` set:
 
 - `DATABASE_URL=postgres://localrummy:a-strong-db-password@localhost:5432/localrummy` (on the VPS always use real PostgreSQL, not the built-in `pglite:` test database)
 - `JWT_SECRET` and `ADMIN_JWT_SECRET`: two different long random strings (`openssl rand -hex 32`)
@@ -39,9 +39,9 @@ pnpm db:seed
 pm2 start deploy/ecosystem.config.cjs && pm2 save && pm2 startup
 
 ADMIN_BASE=/admin/ pnpm --filter @local-rummy/admin build
-mkdir -p /var/www/local-rummy-admin /var/www/local-rummy-prototype
-cp -r apps/admin/dist/* /var/www/local-rummy-admin/
-cp -r prototype/* /var/www/local-rummy-prototype/
+mkdir -p /var/www/local-rummy-admin /var/www/local-rummy-client
+cp -r admin-panel/dist/* /var/www/local-rummy-admin/
+cp -r client/* /var/www/local-rummy-client/
 
 cp deploy/nginx.conf /etc/nginx/sites-available/local-rummy
 ln -sf /etc/nginx/sites-available/local-rummy /etc/nginx/sites-enabled/local-rummy
@@ -67,7 +67,7 @@ After switching to HTTPS, update `CORS_ORIGINS`, rebuild the APK with the `https
 ```bash
 cd /opt/local-rummy && git pull && pnpm install
 pnpm --filter @local-rummy/server build && pm2 restart local-rummy-server   # migrations run on start
-ADMIN_BASE=/admin/ pnpm --filter @local-rummy/admin build && cp -r apps/admin/dist/* /var/www/local-rummy-admin/
+ADMIN_BASE=/admin/ pnpm --filter @local-rummy/admin build && cp -r admin-panel/dist/* /var/www/local-rummy-admin/
 ```
 
 Restarting the server ends any running deals (tables live in memory); entries already taken are not refunded

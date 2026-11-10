@@ -3,12 +3,13 @@
 Indian 13-card rummy with **virtual chips only** (no real money): an Android app, an admin panel and the game server that connects them.
 
 ```
-apps/mobile   ← Android app (React Native + Expo). Players sign in, play live tables, collect bonuses.
-apps/admin    ← Admin panel (React + Vite). Players, game settings, live tables, chips, reports, banners, support.
-apps/server   ← API + live game server (Node.js, Fastify, Socket.io, PostgreSQL).
-packages/rummy← The rummy rules (sets, sequences, jokers, scoring), shared by the server and bots.
-prototype/    ← The earlier click-through web prototype (static files, no server).
-deploy/       ← Nginx and PM2 files for a VPS.
+local-rummy/
+├── server/          ← API + live game server (Node.js, Fastify, Socket.io, PostgreSQL)
+├── admin-panel/     ← Admin website (React + Vite): players, game settings, live tables, chips, reports, banners, support
+├── mobile-app/      ← Android rummy app (React Native + Expo): sign-in, lobby, live tables, bonuses
+├── client/          ← Web game (browser version, static files; today a click-through demo with sample data)
+├── shared/rummy/    ← Rummy rules (sets, sequences, jokers, scoring) used by the server and the AI players
+└── deploy/          ← Nginx, PM2 and the VPS guide
 ```
 
 How the parts talk:
@@ -34,7 +35,7 @@ modified app cannot cheat.
 
 ## Run it on your computer
 
-Needs only **Node.js 22+**. The server uses a built-in test database (saved in `apps/server/.data`), so there is no Docker or PostgreSQL to install.
+Needs only **Node.js 22+**. The server uses a built-in test database (saved in `server/.data`), so there is no Docker or PostgreSQL to install.
 
 ```bash
 npm install -g pnpm
@@ -45,23 +46,23 @@ pnpm dev:admin        # terminal 2 · admin on http://localhost:5173
 pnpm simulate 4 50    # terminal 3 (optional) · plays a 4-player game with a 50-chip entry
 ```
 
-To use real PostgreSQL instead, copy `apps/server/.env.example` to `apps/server/.env` and set `DATABASE_URL=postgres://…`
+To use real PostgreSQL instead, copy `server/.env.example` to `server/.env` and set `DATABASE_URL=postgres://…`
 (`docker compose up -d db` starts one).
 
 Mobile app (on a phone on the same Wi-Fi):
 
 ```bash
-cp apps/mobile/.env.example apps/mobile/.env   # set EXPO_PUBLIC_API_URL to your computer's LAN IP, e.g. http://192.168.1.10:4000
+cp mobile-app/.env.example mobile-app/.env   # set EXPO_PUBLIC_API_URL to your computer's LAN IP, e.g. http://192.168.1.10:4000
 pnpm dev:mobile
 ```
 
 The app uses native modules (secure storage), so use a development build rather than Expo Go:
-`cd apps/mobile && npx eas-cli build --profile development --platform android`.
+`cd mobile-app && npx eas-cli build --profile development --platform android`.
 
 ## Build the APK
 
-1. In `apps/mobile/eas.json`, set `EXPO_PUBLIC_API_URL` in the `apk` profile to your server, e.g. `http://82.112.45.10` (behind Nginx) or `https://api.yourdomain.com`.
-2. `cd apps/mobile && npx eas-cli login && npx eas-cli build --profile apk --platform android`
+1. In `mobile-app/eas.json`, set `EXPO_PUBLIC_API_URL` in the `apk` profile to your server, e.g. `http://82.112.45.10` (behind Nginx) or `https://api.yourdomain.com`.
+2. `cd mobile-app && npx eas-cli login && npx eas-cli build --profile apk --platform android`
 3. EAS gives you a download link for the `.apk`. Install it on Android (allow “Install unknown apps”).
 
 Bump `version` and `android.versionCode` in `app.json` for each new APK. If you raise “Minimum app version” in the admin, older APKs are asked to update.
