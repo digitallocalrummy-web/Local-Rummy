@@ -42,7 +42,7 @@ export function Button({ variant = 'line', className, ...p }: ButtonHTMLAttribut
 export function Switch({ on, onChange, label, disabled }: { on: boolean; onChange: (v: boolean) => void; label: string; disabled?: boolean }) {
   return (
     <button type="button" role="switch" aria-checked={on} aria-label={label} disabled={disabled} onClick={() => onChange(!on)}
-      className={cx('flex h-7 w-12 flex-none cursor-pointer rounded-full border-0 p-[3px] disabled:opacity-50', on ? 'justify-end bg-okbg' : 'justify-start bg-[#3A4440]')}>
+      className={cx('flex h-7 w-12 flex-none cursor-pointer rounded-full border-0 p-[3px] disabled:opacity-50', on ? 'justify-end bg-okbg' : 'justify-start bg-switchoff')}>
       <i className="block h-[22px] w-[22px] rounded-full bg-white" />
     </button>
   );
@@ -94,14 +94,14 @@ export function Field({ label, id, children, hint }: { label: string; id: string
     </div>
   );
 }
-export const inputCls = 'h-10 w-full min-w-0 rounded-[10px] border border-line2 bg-[#0E120F] px-3 text-sm font-semibold text-text outline-0 focus:border-gold';
+export const inputCls = 'h-10 w-full min-w-0 rounded-[10px] border border-line2 bg-field px-3 text-sm font-semibold text-text outline-0 focus:border-gold';
 
 export function Table({ head, children, empty }: { head: ReactNode[]; children: ReactNode; empty?: ReactNode }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-[13px]">
         <thead><tr>{head.map((h, i) => <th key={i} className="border-b border-line px-3 py-2.5 text-left text-[11px] font-extrabold tracking-[1px] whitespace-nowrap text-mute uppercase">{h}</th>)}</tr></thead>
-        <tbody className="[&_td]:border-b [&_td]:border-[#1B221E] [&_td]:px-3 [&_td]:py-2.5 [&_td]:whitespace-nowrap">{children}</tbody>
+        <tbody className="[&_td]:border-b [&_td]:border-line [&_td]:px-3 [&_td]:py-2.5 [&_td]:whitespace-nowrap">{children}</tbody>
       </table>
       {empty}
     </div>
@@ -111,7 +111,7 @@ export function Table({ head, children, empty }: { head: ReactNode[]; children: 
 export const Empty = ({ children }: { children: ReactNode }) => <p className="m-0 px-3 py-8 text-center text-sm text-mute">{children}</p>;
 
 export function Bar({ pct, color = 'var(--color-gold)' }: { pct: number; color?: string }) {
-  return <div className="h-2.5 rounded-[5px] bg-[#1B221E]"><div className="h-full rounded-[5px]" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: color }} /></div>;
+  return <div className="h-2.5 rounded-[5px] bg-track"><div className="h-full rounded-[5px]" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: color }} /></div>;
 }
 
 export function Toast({ children, tone = 'ok' }: { children: ReactNode; tone?: 'ok' | 'bad' }) {

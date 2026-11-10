@@ -72,7 +72,7 @@ export default function GameSetup() {
   const d = c.draft;
   if (!d) return <PageHeader title="Game setup" sub="Loading settings…" />;
   const rule = (title: string, sub: string, control: React.ReactNode) => (
-    <div className="flex flex-wrap items-center gap-3.5 border-b border-[#1B221E] py-3.5 last:border-b-0">
+    <div className="flex flex-wrap items-center gap-3.5 border-b border-line py-3.5 last:border-b-0">
       <div className="min-w-0 flex-[1_1_220px]"><b className="text-sm">{title}</b><span className="block text-xs text-mute">{sub}</span></div>{control}
     </div>
   );
@@ -95,7 +95,7 @@ export default function GameSetup() {
                 <div role="group" aria-label={`Maximum players for ${name}`} className="flex flex-wrap gap-1.5">
                   {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
                     <button key={n} aria-label={`Up to ${n} players`} aria-pressed={n === m.maxPlayers} onClick={() => c.edit((x) => { x.modes[k].maxPlayers = n; })}
-                      className={cx('h-9 w-[34px] cursor-pointer rounded-[9px] border text-[13px] font-extrabold', n <= m.maxPlayers ? 'border-gold/50 bg-gold/16 text-gold2' : 'border-line2 bg-[#0E120F] text-faint')}>{n}</button>
+                      className={cx('h-9 w-[34px] cursor-pointer rounded-[9px] border text-[13px] font-extrabold', n <= m.maxPlayers ? 'border-gold/50 bg-gold/16 text-gold2' : 'border-line2 bg-field text-faint')}>{n}</button>
                   ))}
                 </div>
                 <span className="text-xs text-mute">1 = solo practice · tables of 7 or more use 3 decks</span>

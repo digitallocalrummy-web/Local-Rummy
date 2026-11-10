@@ -20,15 +20,47 @@
   --color-badbg: #E8534A;
   --color-warn: #F0B878;
   --color-info: #A9CBF5;
+  --color-field: #0E120F;
+  --color-nav: #0E120F;
+  --color-track: #1B221E;
+  --color-switchoff: #3A4440;
+  --color-link: #E8C66A;
+  --color-link2: #F5DC94;
   --font-sans: Manrope, system-ui, sans-serif;
   --font-display: Cinzel, serif;
 }
 
+/* Light theme: same tokens, light values. Set by the theme switcher on <html data-theme="light">. */
+:root[data-theme='light'] {
+  --color-ink: #F4F2EC;
+  --color-panel: #FFFFFF;
+  --color-raised: #F3F0E7;
+  --color-line: #E3DED1;
+  --color-line2: #CFC8B6;
+  --color-text: #1B201C;
+  --color-soft: #39423C;
+  --color-mute: #59635D;
+  --color-faint: #6B756F;
+  --color-gold: #D9B456;
+  --color-gold2: #7A5A12;
+  --color-ok: #1B7A4A;
+  --color-bad: #B42318;
+  --color-warn: #9A5300;
+  --color-info: #1F5FA8;
+  --color-field: #FFFFFF;
+  --color-nav: #FBFAF6;
+  --color-track: #ECE8DD;
+  --color-switchoff: #B9B3A3;
+  --color-link: #7A5A12;
+  --color-link2: #5C430C;
+  color-scheme: light;
+}
+:root:not([data-theme='light']) { color-scheme: dark; }
+
 @layer base {
   html, body { background: var(--color-ink); color: var(--color-text); }
   body { margin: 0; font-family: var(--font-sans); }
-  a { color: var(--color-gold); }
-  a:hover { color: var(--color-gold2); }
-  :focus-visible { outline: 2px solid var(--color-gold); outline-offset: 2px; }
-  input, select, textarea { color-scheme: dark; }
+  a { color: var(--color-link); }
+  a:hover { color: var(--color-link2); }
+  :focus-visible { outline: 2px solid var(--color-link); outline-offset: 2px; }
 }

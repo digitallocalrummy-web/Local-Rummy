@@ -43,7 +43,7 @@ export default function LiveTables() {
               <tr key={x.id} className={cx(x.id === t?.id && '[&_td]:bg-gold/7')}>
                 <td><button onClick={() => { setSel(x.id); setMsg(null); }} className="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-extrabold text-text underline decoration-line2 underline-offset-[3px] hover:text-gold2" aria-label={`Open table ${x.id}`}>{x.id}</button></td>
                 <td>{MODE_NAMES[x.mode]}</td>
-                <td><span className="inline-flex items-center gap-2"><span className="inline-block h-1.5 w-[70px] rounded-[3px] bg-[#1B221E]"><span className="block h-full rounded-[3px] bg-gold" style={{ width: `${(x.seated / x.size) * 100}%` }} /></span>{x.seated} / {x.size}</span></td>
+                <td><span className="inline-flex items-center gap-2"><span className="inline-block h-1.5 w-[70px] rounded-[3px] bg-track"><span className="block h-full rounded-[3px] bg-gold" style={{ width: `${(x.seated / x.size) * 100}%` }} /></span>{x.seated} / {x.size}</span></td>
                 <td className="font-bold text-gold2">{x.entry ? fmt(x.entry) : 'Free'}</td><td>{x.turnCount}</td>
                 <td className="text-mute">{x.startedAt ? ago(x.startedAt).replace(' ago', '') : '—'}</td><td><TableStatus s={x.status} /></td>
               </tr>

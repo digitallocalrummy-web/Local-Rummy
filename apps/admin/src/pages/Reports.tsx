@@ -22,7 +22,7 @@ export default function Reports() {
   const cell = (v: number | null, age: number, need: number) => {
     if (age < need || v == null) return <span className="block h-[34px] rounded-md bg-raised text-center text-xs leading-[34px] font-extrabold text-faint">—</span>;
     const a = Math.max(0.15, Math.min(1, v / 50));
-    return <span className="block h-[34px] rounded-md text-center text-xs leading-[34px] font-extrabold" style={{ background: `rgba(232,198,106,${a})`, color: a > 0.5 ? '#1A1406' : '#F5DC94' }}>{v}%</span>;
+    return <span className="block h-[34px] rounded-md text-center text-xs leading-[34px] font-extrabold" style={{ background: `rgba(232,198,106,${a})`, color: a > 0.5 ? '#1A1406' : "var(--color-gold2)" }}>{v}%</span>;
   };
   return (
     <>
@@ -40,8 +40,8 @@ export default function Reports() {
       <section className="flex flex-wrap gap-4">
         <Card className="flex flex-[2_1_520px] flex-col gap-3" title={<>Daily active players <span className="block text-xs font-normal text-mute">Last {range} days</span></>}>
           <svg viewBox="0 0 600 220" preserveAspectRatio="none" role="img" aria-label="Line chart of daily active players" className="h-[220px] w-full">
-            {[55, 110, 165].map((y) => <line key={y} x1="0" y1={y} x2="600" y2={y} stroke="#1F2722" />)}
-            <line x1="0" y1="219" x2="600" y2="219" stroke="#2A352F" />
+            {[55, 110, 165].map((y) => <line key={y} x1="0" y1={y} x2="600" y2={y} stroke="var(--color-line)" />)}
+            <line x1="0" y1="219" x2="600" y2="219" stroke="var(--color-line2)" />
             {series.length > 1 && <polyline points={points} fill="none" stroke="#E8C66A" strokeWidth="3" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
           </svg>
           <div className="flex justify-between text-[11px] text-faint"><span>{series[0]?.day}</span><span>Today</span></div>

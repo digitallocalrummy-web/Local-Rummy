@@ -15,6 +15,7 @@ export const ICONS = {
   reports: 'M3 3v18h18M8 17v-6M13 17V7M18 17v-4',
   content: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0',
   logout: 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9',
+  settings: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z',
 };
 
 const NAV: { group: string; items: { to: string; label: string; icon: keyof typeof ICONS; badge?: 'support' }[] }[] = [
@@ -22,6 +23,7 @@ const NAV: { group: string; items: { to: string; label: string; icon: keyof type
   { group: 'Players', items: [{ to: '/players', label: 'Players', icon: 'players' }, { to: '/support', label: 'Support & reports', icon: 'support', badge: 'support' }] },
   { group: 'Game', items: [{ to: '/games', label: 'Game setup', icon: 'games' }, { to: '/tables', label: 'Live tables', icon: 'live' }, { to: '/chips', label: 'Chips & rewards', icon: 'chips' }] },
   { group: 'Growth', items: [{ to: '/reports', label: 'Reports', icon: 'reports' }, { to: '/content', label: 'Banners & push', icon: 'content' }] },
+  { group: 'Account', items: [{ to: '/settings', label: 'Settings', icon: 'settings' }] },
 ];
 
 const ROLE: Record<string, string> = { super: 'Super admin', moderator: 'Moderator', support: 'Support' };
@@ -32,7 +34,7 @@ export function Shell() {
   const open = (counts.data?.counts?.tickets ?? 0) + (counts.data?.counts?.reports ?? 0);
   return (
     <div className="flex min-h-screen flex-wrap bg-ink">
-      <nav aria-label="Admin sections" className="flex w-full flex-col gap-1 border-b border-line bg-[#0E120F] px-3.5 pt-5 pb-4 md:sticky md:top-0 md:h-screen md:w-60 md:border-r md:border-b-0">
+      <nav aria-label="Admin sections" className="flex w-full flex-col gap-1 border-b border-line bg-nav px-3.5 pt-5 pb-4 md:sticky md:top-0 md:h-screen md:w-60 md:border-r md:border-b-0">
         <NavLink to="/" className="flex items-center gap-2.5 px-2 pb-4 text-gold2 no-underline">
           <Crown />
           <span className="flex flex-col">

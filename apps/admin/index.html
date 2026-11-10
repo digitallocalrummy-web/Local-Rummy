@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex">
   <title>Local Rummy Admin</title>
+  <script>
+    // apply the saved theme before the page paints, so there is no flash of the wrong colours
+    try { var t = localStorage.getItem('lr-admin-theme'); if (t === 'light' || (t === 'system' && matchMedia('(prefers-color-scheme: light)').matches)) document.documentElement.dataset.theme = 'light'; } catch (e) {}
+  </script>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 52 30%27%3E%3Cpath d=%27M3 27 L7 7 L18 17 L26 2 L34 17 L45 7 L49 27 Z%27 fill=%27%23E8C66A%27/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">

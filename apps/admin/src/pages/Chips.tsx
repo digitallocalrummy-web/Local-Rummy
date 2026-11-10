@@ -30,7 +30,7 @@ export default function Chips() {
                 <div key={i} className="flex min-w-0 flex-[1_1_80px] flex-col items-center gap-1 rounded-xl border border-line bg-raised px-2 py-3 text-center">
                   <Label>Day {i + 1}</Label>
                   <b className="text-[15px] text-gold2">{fmt(Math.round(d.bonus.day1 * m))}</b>
-                  <label className="flex items-center gap-1 text-[11px] text-mute">×<input aria-label={`Day ${i + 1} multiplier`} inputMode="decimal" value={m} onChange={(e) => c.edit((x) => { x.bonus.multipliers[i] = Number(e.target.value) || 0; })} className="w-10 rounded border border-line2 bg-[#0E120F] px-1 text-center text-[11px] text-text" /></label>
+                  <label className="flex items-center gap-1 text-[11px] text-mute">×<input aria-label={`Day ${i + 1} multiplier`} inputMode="decimal" value={m} onChange={(e) => c.edit((x) => { x.bonus.multipliers[i] = Number(e.target.value) || 0; })} className="w-10 rounded border border-line2 bg-field px-1 text-center text-[11px] text-text" /></label>
                 </div>
               ))}
             </div>

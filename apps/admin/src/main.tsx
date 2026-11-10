@@ -5,6 +5,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { AuthProvider, useAuth } from './auth';
 import { Shell } from './components/Shell';
 import './index.css';
+import { applyTheme, readTheme } from './theme';
 import Chips from './pages/Chips';
 import Content from './pages/Content';
 import GameSetup from './pages/GameSetup';
@@ -13,7 +14,10 @@ import Login from './pages/Login';
 import Overview from './pages/Overview';
 import Players from './pages/Players';
 import Reports from './pages/Reports';
+import Settings from './pages/Settings';
 import Support from './pages/Support';
+
+applyTheme(readTheme());
 
 const qc = new QueryClient({ defaultOptions: { queries: { staleTime: 5_000, retry: 1, refetchOnWindowFocus: true } } });
 
@@ -39,6 +43,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="chips" element={<Chips />} />
               <Route path="reports" element={<Reports />} />
               <Route path="content" element={<Content />} />
+              <Route path="settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>
