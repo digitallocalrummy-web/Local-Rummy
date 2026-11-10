@@ -19,7 +19,7 @@ export default function Overview() {
     <>
       <PageHeader title={`Good ${hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : 'evening'}, ${admin?.name.split(' ')[0]}`} sub={`Here is what is happening on Local Rummy today · ${new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}`} />
       {q.error && <Card><span className="text-bad">{(q.error as Error).message}</span></Card>}
-      <section aria-label="Key numbers" className="grid grid-cols-[repeat(auto-fit,minmax(210px,1fr))] gap-4">
+      <section aria-label="Key numbers" className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-[repeat(auto-fit,minmax(210px,1fr))]">
         <Kpi label="Players online now" value={fmt(d?.online)} sub={<span className="inline-flex items-center gap-1.5 text-ok"><span className="h-2 w-2 rounded-full bg-okbg" />Live</span>} />
         <Kpi label="Daily active players" value={fmt(d?.dau)} sub={d && <Delta now={d.dau} before={d.dauYesterday} />} />
         <Kpi label="Games played today" value={fmt(d?.gamesToday)} sub={d && <Delta now={d.gamesToday} before={d.gamesYesterday} />} />

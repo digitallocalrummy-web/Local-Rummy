@@ -39,7 +39,7 @@ export function PublishBar({ c }: { c: ReturnType<typeof useConfigDraft> }) {
   const canEdit = useCanEdit();
   const meta = c.q.data;
   return (
-    <section className="sticky bottom-3 flex flex-wrap items-center gap-3 rounded-[14px] border border-gold/35 bg-raised px-4.5 py-3.5">
+    <section className="sticky bottom-[76px] z-20 flex md:bottom-3 flex-wrap items-center gap-3 rounded-[14px] border border-gold/35 bg-raised px-4.5 py-3.5">
       <span className="flex-[1_1_260px] text-[13px]">
         {c.msg ? <span className={c.msg.tone === 'ok' ? 'text-ok' : 'text-bad'}>{c.msg.text}</span>
           : c.dirty ? <><b className="text-gold2">Unsaved changes.</b> Players get them as soon as you publish.</>

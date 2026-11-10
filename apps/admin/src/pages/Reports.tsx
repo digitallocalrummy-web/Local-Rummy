@@ -30,7 +30,7 @@ export default function Reports() {
         <Chips label="Date range" value={range} onChange={setRange} options={[{ value: 7, label: '7 days' }, { value: 30, label: '30 days' }, { value: 90, label: '90 days' }]} />
         <Button onClick={exportCsv} disabled={!series.length}>Export CSV</Button>
       </PageHeader>
-      <section className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
         <Kpi label="Daily active (avg)" value={fmt(avg('players'))} />
         <Kpi label="New players" value={fmt(series.reduce((s, x) => s + x.signups, 0))} />
         <Kpi label="Games played" value={fmt(series.reduce((s, x) => s + x.games, 0))} />

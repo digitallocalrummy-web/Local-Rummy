@@ -4,7 +4,7 @@ export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Bool
 
 export function Card({ children, className, title, action }: { children: ReactNode; className?: string; title?: ReactNode; action?: ReactNode }) {
   return (
-    <section className={cx('min-w-0 rounded-[14px] border border-line bg-panel p-5', className)}>
+    <section className={cx('min-w-0 rounded-[14px] border border-line bg-panel p-4 sm:p-5', className)}>
       {(title || action) && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
           {title && <h2 className="m-0 flex-1 text-base font-extrabold">{title}</h2>}
@@ -60,7 +60,7 @@ export function Kpi({ label, value, sub, subTone }: { label: string; value: Reac
   return (
     <Card className="flex flex-col gap-2">
       <Label>{label}</Label>
-      <b className="text-[28px] font-extrabold">{value}</b>
+      <b className="text-[22px] font-extrabold sm:text-[28px]">{value}</b>
       {sub && <span className={cx('text-xs font-bold', subTone === 'ok' ? 'text-ok' : subTone === 'bad' ? 'text-bad' : subTone === 'warn' ? 'text-warn' : 'text-mute')}>{sub}</span>}
     </Card>
   );

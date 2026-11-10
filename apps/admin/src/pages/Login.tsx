@@ -18,20 +18,20 @@ export default function Login() {
   };
   return (
     <div className="flex min-h-screen flex-wrap bg-ink">
-      <section className="flex min-w-0 flex-[1_1_480px] flex-col justify-center gap-7 border-r border-[#1E6B45] bg-felt px-8 py-14 sm:px-16">
+      <section className="flex min-w-0 flex-[1_1_480px] flex-col justify-center gap-4 border-b border-[#1E6B45] bg-felt px-6 py-8 sm:gap-7 sm:border-r sm:border-b-0 sm:px-16 sm:py-14">
         <Crown w={78} />
         <div>
-          <h1 className="m-0 font-display text-5xl leading-none tracking-[3px] text-gold2">LOCAL RUMMY</h1>
+          <h1 className="m-0 font-display text-3xl leading-none tracking-[3px] text-gold2 sm:text-5xl">LOCAL RUMMY</h1>
           <p className="mt-2.5 mb-0 text-[13px] font-extrabold tracking-[3px] text-[#CFE3D6]">ADMIN CONSOLE</p>
         </div>
-        <p className="m-0 max-w-[440px] text-lg leading-relaxed text-[#E3EEE7]">One place to run the game: players, tables, chips, banners and support.</p>
-        <ul className="m-0 flex list-none flex-col gap-3.5 p-0 text-[15px] text-[#E3EEE7]">
+        <p className="m-0 hidden max-w-[440px] text-lg leading-relaxed text-[#E3EEE7] sm:block">One place to run the game: players, tables, chips, banners and support.</p>
+        <ul className="m-0 hidden list-none flex-col gap-3.5 p-0 text-[15px] text-[#E3EEE7] sm:flex">
           {['Change table rules and the app picks them up', 'Watch live tables and step in when one gets stuck', 'Virtual chips only · no real money'].map((t) => (
             <li key={t} className="flex items-center gap-3"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E8C66A" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M20 6L9 17l-5-5" /></svg>{t}</li>
           ))}
         </ul>
       </section>
-      <section className="flex min-w-0 flex-[1_1_420px] items-center justify-center px-8 py-14">
+      <section className="flex min-w-0 flex-[1_1_420px] items-start justify-center px-6 py-8 sm:items-center sm:px-8 sm:py-14">
         <form onSubmit={submit} aria-labelledby="h" className="flex w-full max-w-[420px] flex-col gap-5">
           <div>
             <h2 id="h" className="m-0 text-[28px] font-extrabold">Sign in</h2>

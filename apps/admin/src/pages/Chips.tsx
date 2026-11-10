@@ -15,7 +15,7 @@ export default function Chips() {
   return (
     <>
       <PageHeader title="Chips & rewards" sub="Virtual chips only · no cash value · cannot be bought back or withdrawn" />
-      <section className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4">
+      <section className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-[repeat(auto-fit,minmax(200px,1fr))]">
         <Kpi label="Chips in player wallets" value={short(q.data?.inWallets ?? 0)} />
         <Kpi label="Given free today" value={<span className="text-ok">+{short(q.data?.bonusToday ?? 0)}</span>} sub="Welcome, daily bonus and refills" />
         <Kpi label="Spent on table entries today" value={short(q.data?.entriesToday ?? 0)} />

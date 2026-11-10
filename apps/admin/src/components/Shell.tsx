@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
-import { NavLink, Outlet } from 'react-router';
+import { useEffect, useState, type ReactNode } from 'react';
+import { NavLink, Outlet, useLocation } from 'react-router';
 import { api } from '../api';
 import { useAuth } from '../auth';
 import { Avatar, Crown, Icon, cx } from './ui';
@@ -28,45 +28,120 @@ const NAV: { group: string; items: { to: string; label: string; icon: keyof type
 
 const ROLE: Record<string, string> = { super: 'Super admin', moderator: 'Moderator', support: 'Support' };
 
-export function Shell() {
-  const { admin, logout } = useAuth();
-  const counts = useQuery({ queryKey: ['ticket-counts'], queryFn: () => api('/api/admin/tickets?kind=ticket'), refetchInterval: 30_000 });
-  const open = (counts.data?.counts?.tickets ?? 0) + (counts.data?.counts?.reports ?? 0);
+function NavList({ open, onNavigate }: { open: number; onNavigate?: () => void }) {
   return (
-    <div className="flex min-h-screen flex-wrap bg-ink">
-      <nav aria-label="Admin sections" className="flex w-full flex-col gap-1 border-b border-line bg-nav px-3.5 pt-5 pb-4 md:sticky md:top-0 md:h-screen md:w-60 md:border-r md:border-b-0">
-        <NavLink to="/" className="flex items-center gap-2.5 px-2 pb-4 text-gold2 no-underline">
-          <Crown />
-          <span className="flex flex-col">
-            <b className="font-display text-[15px] leading-tight tracking-[1.5px]">LOCAL RUMMY</b>
-            <span className="text-[10px] font-extrabold tracking-[2.4px] text-mute">ADMIN CONSOLE</span>
-          </span>
-        </NavLink>
-        <div className="flex flex-wrap gap-1 md:flex-col md:flex-nowrap md:overflow-y-auto">
-          {NAV.map((g) => (
-            <div key={g.group} className="contents md:block">
-              <span className="hidden px-2.5 pt-3.5 pb-1.5 text-[10px] font-extrabold tracking-[1.6px] text-faint uppercase md:block">{g.group}</span>
-              {g.items.map((it) => (
-                <NavLink key={it.to} to={it.to} end={it.to === '/'}
-                  className={({ isActive }) => cx('flex h-[42px] items-center gap-3 rounded-[10px] px-3 text-sm no-underline',
-                    isActive ? 'bg-gold/14 font-extrabold text-gold2 shadow-[inset_0_0_0_1px_rgba(232,198,106,.35)]' : 'font-semibold text-soft hover:bg-raised hover:text-text')}>
-                  <Icon d={ICONS[it.icon]} />
-                  <span className="flex-1">{it.label}</span>
-                  {it.badge && open > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#C8343B] px-1.5 text-[11px] font-extrabold text-white">{open}</span>}
-                </NavLink>
-              ))}
-            </div>
+    <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+      {NAV.map((g) => (
+        <div key={g.group}>
+          <span className="block px-2.5 pt-3.5 pb-1.5 text-[10px] font-extrabold tracking-[1.6px] text-faint uppercase">{g.group}</span>
+          {g.items.map((it) => (
+            <NavLink key={it.to} to={it.to} end={it.to === '/'} onClick={onNavigate}
+              className={({ isActive }) => cx('flex h-11 items-center gap-3 rounded-[10px] px-3 text-sm no-underline',
+                isActive ? 'bg-gold/14 font-extrabold text-gold2 shadow-[inset_0_0_0_1px_rgba(232,198,106,.35)]' : 'font-semibold text-soft hover:bg-raised hover:text-text')}>
+              <Icon d={ICONS[it.icon]} />
+              <span className="flex-1">{it.label}</span>
+              {it.badge && open > 0 && <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#C8343B] px-1.5 text-[11px] font-extrabold text-white">{open}</span>}
+            </NavLink>
           ))}
         </div>
-        <div className="mt-auto hidden items-center gap-2.5 border-t border-line px-2.5 pt-3.5 md:flex">
-          <Avatar name={admin?.name ?? 'Admin'} color="#1F6B4A" size={36} ring />
-          <span className="flex min-w-0 flex-1 flex-col"><b className="truncate text-[13px]">{admin?.name}</b><span className="text-[11px] text-mute">{ROLE[admin?.role ?? 'support']}</span></span>
-          <button onClick={logout} aria-label="Log out" className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-[10px] border-0 bg-transparent text-mute hover:bg-raised"><Icon d={ICONS.logout} /></button>
-        </div>
+      ))}
+    </div>
+  );
+}
+
+function AdminCard() {
+  const { admin, logout } = useAuth();
+  return (
+    <div className="mt-auto flex items-center gap-2.5 border-t border-line px-2.5 pt-3.5">
+      <Avatar name={admin?.name ?? 'Admin'} color="#1F6B4A" size={36} ring />
+      <span className="flex min-w-0 flex-1 flex-col"><b className="truncate text-[13px]">{admin?.name}</b><span className="text-[11px] text-mute">{ROLE[admin?.role ?? 'support']}</span></span>
+      <button onClick={logout} aria-label="Log out" className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-[10px] border-0 bg-transparent text-mute hover:bg-raised"><Icon d={ICONS.logout} /></button>
+    </div>
+  );
+}
+
+const Brand = () => (
+  <NavLink to="/" className="flex items-center gap-2.5 text-gold2 no-underline">
+    <Crown />
+    <span className="flex flex-col">
+      <b className="font-display text-[15px] leading-tight tracking-[1.5px]">LOCAL RUMMY</b>
+      <span className="text-[10px] font-extrabold tracking-[2.4px] text-mute">ADMIN CONSOLE</span>
+    </span>
+  </NavLink>
+);
+
+/** Bottom tabs on phones: the four pages used most, plus the full menu. */
+const TABS: { to: string; label: string; icon: keyof typeof ICONS }[] = [
+  { to: '/', label: 'Overview', icon: 'overview' },
+  { to: '/players', label: 'Players', icon: 'players' },
+  { to: '/tables', label: 'Tables', icon: 'live' },
+  { to: '/games', label: 'Setup', icon: 'games' },
+];
+
+export function Shell() {
+  const counts = useQuery({ queryKey: ['ticket-counts'], queryFn: () => api('/api/admin/tickets?kind=ticket'), refetchInterval: 30_000 });
+  const open = (counts.data?.counts?.tickets ?? 0) + (counts.data?.counts?.reports ?? 0);
+  const [menu, setMenu] = useState(false);
+  const loc = useLocation();
+  useEffect(() => setMenu(false), [loc.pathname]);
+  useEffect(() => {
+    if (!menu) return;
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenu(false); };
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [menu]);
+
+  return (
+    <div className="flex min-h-screen bg-ink">
+      {/* Desktop and tablet: fixed side menu */}
+      <nav aria-label="Admin sections" className="sticky top-0 hidden h-screen w-60 flex-none flex-col gap-1 border-r border-line bg-nav px-3.5 pt-5 pb-4 md:flex">
+        <div className="px-2 pb-2"><Brand /></div>
+        <NavList open={open} />
+        <AdminCard />
       </nav>
-      <main className="flex min-w-0 flex-[999_1_560px] flex-col gap-5 px-4 pt-6 pb-10 sm:px-8">
-        <Outlet />
-      </main>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Phone: top bar */}
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-nav/95 px-4 backdrop-blur md:hidden">
+          <Brand />
+        </header>
+
+        <main className="flex min-w-0 flex-col gap-4 px-4 pt-5 pb-28 sm:gap-5 sm:px-8 md:pt-6 md:pb-10">
+          <Outlet />
+        </main>
+
+        {/* Phone: bottom tabs */}
+        <nav aria-label="Main pages" className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-nav/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+          {TABS.map((t) => (
+            <NavLink key={t.to} to={t.to} end={t.to === '/'}
+              className={({ isActive }) => cx('flex h-16 flex-1 flex-col items-center justify-center gap-1 text-[11px] font-bold no-underline', isActive ? 'text-gold2' : 'text-mute')}>
+              <Icon d={ICONS[t.icon]} size={20} />{t.label}
+            </NavLink>
+          ))}
+          <button onClick={() => setMenu(true)} className="relative flex h-16 flex-1 cursor-pointer flex-col items-center justify-center gap-1 border-0 bg-transparent text-[11px] font-bold text-mute">
+            <Icon d="M3 6h18M3 12h18M3 18h18" size={20} />More
+            {open > 0 && <span className="absolute top-2.5 right-[calc(50%-16px)] h-2.5 w-2.5 rounded-full bg-[#C8343B]" />}
+          </button>
+        </nav>
+      </div>
+
+      {/* Phone: full menu drawer */}
+      {menu && (
+        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+          <button aria-label="Close menu" onClick={() => setMenu(false)} className="absolute inset-0 cursor-default border-0 bg-black/55" />
+          <nav className="absolute inset-y-0 right-0 flex w-[min(86vw,320px)] flex-col gap-1 border-l border-line bg-nav px-3.5 pt-4 pb-[max(16px,env(safe-area-inset-bottom))] shadow-2xl">
+            <div className="flex items-center gap-2 px-2 pb-1">
+              <Brand />
+              <span className="flex-1" />
+              <button onClick={() => setMenu(false)} aria-label="Close menu" className="flex h-11 w-11 cursor-pointer items-center justify-center rounded-[10px] border-0 bg-transparent text-mute hover:bg-raised">
+                <Icon d="M18 6L6 18M6 6l12 12" size={20} />
+              </button>
+            </div>
+            <NavList open={open} onNavigate={() => setMenu(false)} />
+            <AdminCard />
+          </nav>
+        </div>
+      )}
     </div>
   );
 }
@@ -75,7 +150,7 @@ export function PageHeader({ title, sub, children }: { title: ReactNode; sub?: R
   return (
     <header className="flex flex-wrap items-center gap-3">
       <div className="min-w-0 flex-[1_1_280px]">
-        <h1 className="m-0 flex items-center gap-2.5 text-[26px] font-extrabold">{title}</h1>
+        <h1 className="m-0 flex items-center gap-2.5 text-[22px] font-extrabold sm:text-[26px]">{title}</h1>
         {sub && <p className="mt-1 mb-0 text-[13px] text-mute">{sub}</p>}
       </div>
       {children}

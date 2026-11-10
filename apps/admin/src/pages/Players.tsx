@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ago, api, fmt, MODE_NAMES, signed } from '../api';
 import { useCanEdit } from '../auth';
 import { PageHeader } from '../components/Shell';
@@ -13,6 +13,12 @@ export default function Players() {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [sel, setSel] = useState<string | null>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const open = (id: string) => {
+    setSel(id);
+    // on phones the details sit below the list, so bring them into view
+    if (window.innerWidth < 768) setTimeout(() => panel.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  };
   useEffect(() => { const t = setTimeout(() => { setSearch(q); setPage(1); }, 300); return () => clearTimeout(t); }, [q]);
   const list = useQuery({ queryKey: ['players', filter, search, page], queryFn: () => api(`/api/admin/players?filter=${filter}&page=${page}&q=${encodeURIComponent(search)}`) });
   const rows: any[] = list.data?.rows ?? [];
@@ -38,21 +44,41 @@ export default function Players() {
       </section>
       <section className="flex flex-wrap items-start gap-4">
         <Card className="flex-[999_1_560px] !p-2">
+          <ul className="m-0 flex list-none flex-col gap-1.5 p-0 md:hidden">
+            {rows.map((u) => (
+              <li key={u.id}>
+                <button onClick={() => open(u.id)} className={cx('flex w-full cursor-pointer items-center gap-3 rounded-xl border p-3 text-left text-text', u.id === selected ? 'border-gold/45 bg-raised' : 'border-transparent bg-transparent')}>
+                  <Avatar name={u.name} color={u.color} size={38} />
+                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <b className="truncate text-sm">{u.name}</b>
+                    <span className="text-xs text-mute">{u.code} · Lv {u.level} · {u.gamesPlayed} games · {ago(u.lastActiveAt)}</span>
+                  </span>
+                  <span className="flex flex-col items-end gap-1">
+                    <b className="text-sm text-gold2">{fmt(u.chips)}</b>
+                    {u.status === 'blocked' ? <Pill tone="bad">Blocked</Pill> : u.isNew ? <Pill tone="info">New</Pill> : <Pill tone="ok">Active</Pill>}
+                  </span>
+                </button>
+              </li>
+            ))}
+            {!rows.length && <Empty>{list.isLoading ? 'Loading…' : 'No players match.'}</Empty>}
+          </ul>
+          <div className="hidden md:block">
           <Table head={['Player', 'Player ID', 'Level', 'Chips', 'Games', 'Win rate', 'Last active', 'Status']} empty={!rows.length && <Empty>{list.isLoading ? 'Loading…' : 'No players match.'}</Empty>}>
             {rows.map((u) => (
               <tr key={u.id} className={cx(u.id === selected && '[&_td]:bg-gold/7')}>
-                <td><button onClick={() => setSel(u.id)} aria-label={`Open ${u.name}`} className="flex cursor-pointer items-center gap-2.5 border-0 bg-transparent p-0 text-left text-[13px] font-bold text-text hover:text-gold2"><Avatar name={u.name} color={u.color} />{u.name}</button></td>
+                <td><button onClick={() => open(u.id)} aria-label={`Open ${u.name}`} className="flex cursor-pointer items-center gap-2.5 border-0 bg-transparent p-0 text-left text-[13px] font-bold text-text hover:text-gold2"><Avatar name={u.name} color={u.color} />{u.name}</button></td>
                 <td className="text-mute">{u.code}</td><td>{u.level}</td><td className="font-bold text-gold2">{fmt(u.chips)}</td><td>{u.gamesPlayed}</td><td>{u.winRate}%</td><td className="text-mute">{ago(u.lastActiveAt)}</td>
                 <td>{u.status === 'blocked' ? <Pill tone="bad">Blocked</Pill> : u.isNew ? <Pill tone="info">New</Pill> : <Pill tone="ok">Active</Pill>}</td>
               </tr>
             ))}
           </Table>
+          </div>
           <div className="flex items-center justify-between p-3 text-xs text-mute">
             <span>Showing {rows.length} of {fmt(list.data?.total)}</span>
             <span className="flex items-center gap-2"><Button className="!h-8" disabled={page <= 1} onClick={() => setPage(page - 1)} aria-label="Previous page">‹</Button>Page {page} of {pages}<Button className="!h-8" disabled={page >= pages} onClick={() => setPage(page + 1)} aria-label="Next page">›</Button></span>
           </div>
         </Card>
-        {selected && <PlayerPanel id={selected} />}
+        {selected && <div ref={panel} className="flex min-w-0 flex-[1_1_320px] scroll-mt-16"><PlayerPanel id={selected} /></div>}
       </section>
     </>
   );
