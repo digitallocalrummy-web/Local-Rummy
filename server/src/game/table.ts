@@ -163,7 +163,9 @@ export class Table {
     this.hooks.onEvent(this, { type: 'wild', card: this.wild });
     this.hooks.onChange(this);
     // give the apps time to play the shuffle and deal animation
-    const dealMs = 1200 + Math.min(2600, 13 * this.size * 22);
+    const total = 13 * this.size;
+    const gap = Math.max(16, Math.min(80, Math.round(2200 / total)));
+    const dealMs = 2500 + total * gap; // matches the riffle + deal animation in the app
     this.later(dealMs, () => this.beginTurn(randomInt(0, this.size)));
   }
 

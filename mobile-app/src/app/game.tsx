@@ -1,25 +1,23 @@
+import { arrange, bestDiscard, type Card as RCard, type Rank } from '@local-rummy/rummy';
 import { router } from 'expo-router';
-import { LogOut } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { AnimatedModal } from '../components/AnimatedModal';
-import { ChipBalance, formatChips } from '../components/ChipBalance';
+import { formatChips } from '../components/ChipBalance';
 import { SuitPattern } from '../components/Decor';
 import { GameButton } from '../components/GameButton';
-import { OpponentPanel, OpponentPill } from '../components/PlayerInfo';
-import { PlayerAvatar } from '../components/PlayerAvatar';
-import { PlayingCard } from '../components/PlayingCard';
 import { MODE_LABEL } from '../components/TableSetup';
-import { HandCard, type Point } from '../game/HandCard';
-import { BottomControls, CardDeck, DiscardFan, DiscardPile, GameHeader, GameTable, StatusBanner } from '../game/TableParts';
-import { handSlots, useGameLayout } from '../game/useGameLayout';
+import { HandCard } from '../game/HandCard';
+import {
+  Banner, Deck, Felt, FlyCard, Me, OpenPile, OpponentSeat, Riffle, RightRail, SEAT_LAYOUTS, Tray, useStage, type Flight,
+} from '../game/Stage';
 import { WaitingRoom } from '../game/WaitingRoom';
 import { useLayout } from '../hooks/useLayout';
 import { initialsOf, useSession, type SeatView, type TableEvent } from '../net/session';
 import { useSettings } from '../state/settings';
-import { colors, fonts, motion } from '../theme';
-import type { Card, Opponent } from '../types';
+import { colors, fonts } from '../theme';
+import type { Card } from '../types';
 
 const suitOrder: Record<string, number> = { '♠': 0, '♥': 1, '♣': 2, '♦': 3, '★': 4 };
 const rankOrder = (r: string) => ({ A: 1, J: 11, Q: 12, K: 13, JK: 14 } as Record<string, number>)[r] ?? parseInt(r, 10);
@@ -27,47 +25,53 @@ const sortCards = (cards: Card[]) => [...cards].sort((a, b) => suitOrder[a.suit]
 const emotes = ['Good luck!', 'Well played', 'Nice move', 'Hurry up!'];
 const label = (c: Card) => (c.rank === 'JK' ? 'Joker' : c.rank + c.suit);
 
-function toOpponent(seat: SeatView, turn: number): Opponent {
-  const out = seat.status !== 'playing';
-  return {
-    id: `seat${seat.idx}`, name: seat.name, initials: seat.code || initialsOf(seat.name), color: seat.color, chips: 0,
-    cardCount: seat.cards, isAI: seat.isBot, lastCard: seat.lastThrown ?? undefined,
-    status: out ? 'dropped' : seat.idx === turn ? 'thinking' : seat.lastThrown ? 'last-played' : 'waiting',
-  };
+/** Deal animation timing, the same as the web version (the server waits for it before the first turn). */
+const RIFFLE_MS = 960;
+const FLY_MS = 260;
+const dealGap = (total: number) => Math.max(16, Math.min(80, Math.round(2200 / total)));
+function dealTimeline(size: number) {
+  const total = 13 * size, gap = dealGap(total);
+  const lastLand = RIFFLE_MS + (total - 1) * gap + FLY_MS;
+  const jokerAt = lastLand + 150;
+  const openAt = jokerAt + 500;
+  return { total, gap, lastLand, jokerAt, openAt, openLand: openAt + 300, end: openAt + 1300 };
 }
 
-/** Compact seat for tables with 4–9 opponents. */
-function SeatChip({ o, s, active, away }: { o: Opponent; s: number; active: boolean; away: boolean }) {
-  return (
-    <View accessible accessibilityLabel={`${o.name}, ${o.cardCount} cards${active ? ', playing now' : ''}`}
-      style={{ width: 84 * s, alignItems: 'center', gap: 2 * s, paddingVertical: 4 * s, borderRadius: 12 * s, borderWidth: active ? 2 : 1, borderColor: active ? colors.goldBright : 'rgba(201,162,74,0.5)', backgroundColor: 'rgba(6,40,24,0.93)', opacity: o.status === 'dropped' ? 0.55 : 1 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 * s }}>
-        <PlayerAvatar player={o} size={26 * s} badge={o.cardCount} />
-        {o.lastCard ? <PlayingCard card={o.lastCard} width={18 * s} /> : null}
-      </View>
-      <Text numberOfLines={1} style={{ fontFamily: fonts.uiHeavy, fontSize: 10 * s, color: colors.textWhite, maxWidth: 78 * s }}>{o.name}</Text>
-      <Text style={{ fontFamily: fonts.uiBold, fontSize: 7.5 * s, letterSpacing: 1, color: active ? colors.goldBright : colors.textMuted }}>
-        {away ? 'OFFLINE' : o.status === 'dropped' ? 'DROPPED' : active ? 'PLAYING' : o.isAI ? 'AI' : 'WAITING'}
-      </Text>
-    </View>
-  );
+/** Hand positions in stage units, the same formula as the web version. */
+function handXs(hand: Card[], grouped: boolean) {
+  const n = hand.length, gap = grouped ? 14 : 0;
+  let breaks = 0;
+  for (let i = 1; i < n; i++) if (hand[i].suit !== hand[i - 1].suit) breaks++;
+  const area = 600, step = Math.min(44, (area - 66 - breaks * gap) / Math.max(1, n - 1));
+  const total = step * (n - 1) + 66 + breaks * gap;
+  let x = 150 + (area - total) / 2;
+  return hand.map((c, i) => { if (i > 0) { x += step; if (grouped && c.suit !== hand[i - 1].suit) x += gap; } return x; });
+}
+
+function seatStatus(seat: SeatView, active: boolean) {
+  if (!seat.connected) return 'OFFLINE';
+  if (seat.status === 'dropped') return 'DROPPED';
+  if (seat.status === 'invalid') return 'WRONG SHOW';
+  if (active) return 'THINKING…';
+  if (seat.lastThrown) return `THREW ${label(seat.lastThrown)}`;
+  return seat.isBot ? 'WAITING · AI' : 'WAITING';
 }
 
 export default function GameScreen() {
   const screen = useLayout();
-  const L = useGameLayout(screen);
-  const { s, insets } = screen;
+  const st = useStage(screen);
   const { animations, tap } = useSettings();
   const { table, me, config, connected, draw, discard, declare, drop, leave, chat, onEvent } = useSession();
-
-  const deckPoint = useMemo(() => ({ x: L.deck.x + 2 * s, y: L.deck.y }), [L.deck, s]);
-  const openPoint = useMemo(() => ({ x: L.open.x + 2 * s, y: L.open.y }), [L.open, s]);
+  const z = st.z;
+  const cardW = z(66);
+  const deckTL = useMemo(() => ({ x: st.x(352), y: st.y(162) }), [st.x, st.y]); // eslint-disable-line react-hooks/exhaustive-deps
+  const openTL = useMemo(() => ({ x: st.x(500) - z(2), y: st.y(162) - z(4) }), [st.x, st.y, z]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // the player's own arrangement of their cards; the server only knows which cards they hold
   const [order, setOrder] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [grouped, setGrouped] = useState(false);
-  const [entering, setEntering] = useState<Record<string, { from: Point; delay: number }>>({});
+  const [entering, setEntering] = useState<Record<string, { from: { x: number; y: number }; delay: number }>>({});
   const [discardingId, setDiscardingId] = useState<string | null>(null);
   const [declareOpen, setDeclareOpen] = useState(false);
   const [leaveOpen, setLeaveOpen] = useState(false);
@@ -75,13 +79,48 @@ export default function GameScreen() {
   const [bubble, setBubble] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [flights, setFlights] = useState<Flight[]>([]);
+  const [deal, setDeal] = useState<{ at: number; order: number[]; size: number } | null>(null);
+  const [now, setNow] = useState(() => Date.now());
   const lastFrom = useRef<'deck' | 'open' | null>(null);
+  const dealRef = useRef<{ at: number; order: number[]; size: number } | null>(null);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const later = useCallback((ms: number, fn: () => void) => { timers.current.push(setTimeout(fn, ms)); }, []);
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
-
   const flash = useCallback((msg: string, ms = 2600) => { setToast(msg); later(ms, () => setToast((t) => (t === msg ? null : t))); }, [later]);
 
+  const tl = useMemo(() => (deal ? dealTimeline(deal.size) : null), [deal]);
+  const elapsed = deal ? now - deal.at : Infinity;
+  const dealing = !!tl && animations && elapsed < tl.end;
+
+  // tick while the deal animation runs, to reveal the deck, joker and open card on time
+  useEffect(() => {
+    if (!deal || !tl) return;
+    const id = setInterval(() => {
+      const t = Date.now();
+      setNow(t);
+      if (t - deal.at > tl.end) clearInterval(id);
+    }, 80);
+    return () => clearInterval(id);
+  }, [deal, tl]);
+
+  // ---------- seats ----------
+  const opps = useMemo(() => {
+    if (!table) return [] as { seat: SeatView; at: { x: number; y: number } }[];
+    const n = table.seats.length;
+    const layout = SEAT_LAYOUTS[Math.min(9, n - 1)] ?? [];
+    const list: { seat: SeatView; at: { x: number; y: number } }[] = [];
+    for (let k = 1; k < n; k++) list.push({ seat: table.seats[(table.you + k) % n], at: layout[k - 1] ?? { x: 415, y: 46 } });
+    return list;
+  }, [table]);
+  const seatCentre = useCallback((idx: number) => {
+    const o = opps.find((x) => x.seat.idx === idx);
+    return o ? { x: st.x(o.at.x), y: st.y(o.at.y) } : { x: st.x(76), y: st.y(366) };
+  }, [opps, st]);
+  const seatRef = useRef(seatCentre);
+  useEffect(() => { seatRef.current = seatCentre; }, [seatCentre]);
+
+  // ---------- hand ----------
   const serverHand = table?.hand;
   useEffect(() => {
     if (!serverHand) return;
@@ -90,38 +129,92 @@ export default function GameScreen() {
       const kept = prev.filter((id) => ids.has(id));
       const added = serverHand.filter((c) => !kept.includes(c.id));
       if (!prev.length && added.length >= 13) {
-        // first deal: every card flies in from the deck, then the hand is sorted
+        // first deal: each card flies from the deck in its dealing round, then the hand is sorted
         const sorted = sortCards(added).map((c) => c.id);
-        setEntering(Object.fromEntries(sorted.map((id, i) => [id, { from: deckPoint, delay: 200 + i * motion.dealStagger }])));
+        const d = dealRef.current;
+        const fresh = d && Date.now() - d.at < 4000;
+        const pos = fresh ? Math.max(0, d.order.indexOf(table?.you ?? 0)) : 0;
+        const gap = fresh ? dealGap(13 * d.size) : 0;
+        const base = fresh ? RIFFLE_MS - (Date.now() - d.at) : 0;
+        setEntering(Object.fromEntries(sorted.map((id, i) => [id, { from: deckTL, delay: Math.max(0, fresh ? base + (i * d.size + pos) * gap : 120 + i * 40) }])));
         return sorted;
       }
       if (added.length) {
-        const from = lastFrom.current === 'open' ? openPoint : deckPoint;
+        const from = lastFrom.current === 'open' ? openTL : deckTL;
         setEntering((e) => ({ ...e, ...Object.fromEntries(added.map((c) => [c.id, { from, delay: 0 }])) }));
         setSelected(added.map((c) => c.id));
       }
       return [...kept, ...added.map((c) => c.id)];
     });
-  }, [serverHand, deckPoint, openPoint]);
+  }, [serverHand, deckTL, openTL, table?.you]);
 
-  // table events: chat bubbles, declarations and the end of the deal
+  // ---------- table events: deal animation, opponents' draws and throws, chat ----------
   useEffect(() => onEvent((e: TableEvent) => {
     const name = (i: number) => (i < 0 ? 'Local Rummy' : table?.seats[i]?.name ?? 'Player');
+    const you = table?.you ?? -1;
+    if (e.type === 'dealt') {
+      const d = { at: Date.now(), order: (e as { order?: number[] }).order ?? [], size: ((e as { order?: number[] }).order ?? []).length || 1 };
+      dealRef.current = d;
+      setOrder([]); setSelected([]); setGrouped(false);
+      setDeal(d); setNow(d.at);
+    }
+    if (e.type === 'drew' && e.seat !== you && animations) {
+      const to = seatRef.current(e.seat);
+      const from = e.from === 'open' ? openTL : deckTL;
+      setFlights((f) => [...f, { id: `d${Date.now()}${e.seat}`, card: e.card ?? null, from, to: { x: to.x - cardW / 2, y: to.y - cardW * 0.725 }, delay: 0, dur: 340, s1: 0.4 }]);
+    }
+    if (e.type === 'discarded' && e.seat !== you && animations) {
+      const fromC = seatRef.current(e.seat);
+      setFlights((f) => [...f, { id: `t${Date.now()}${e.seat}`, card: e.card, from: { x: fromC.x - cardW / 2, y: fromC.y - cardW * 0.725 }, to: openTL, delay: 0, dur: 420, s0: 0.4, s1: 0.94, r0: fromC.x > st.x(600) ? 20 : -20 }]);
+    }
     if (e.type === 'chat') flash(`${name(e.seat)}: ${e.text}`);
-    if (e.type === 'dropped' && e.seat !== table?.you) flash(`${name(e.seat)} dropped (${e.points} pts)`);
-    if (e.type === 'declared' && e.seat !== table?.you) flash(e.valid ? `${name(e.seat)} declared!` : `${name(e.seat)} made a wrong show`);
-    if (e.type === 'timeout' && e.seat === table?.you) flash('Time’s up · a card was played for you');
+    if (e.type === 'dropped' && e.seat !== you) flash(`${name(e.seat)} dropped (${e.points} pts)`);
+    if (e.type === 'declared' && e.seat !== you) flash(e.valid ? `${name(e.seat)} declared!` : `${name(e.seat)} made a wrong show`);
+    if (e.type === 'timeout' && e.seat === you) flash('Time’s up · a card was played for you');
     if (e.type === 'ended') { tap('success'); later(1400, () => router.replace('/result')); }
-  }), [onEvent, flash, later, tap, table?.seats, table?.you]);
+  }), [onEvent, flash, later, tap, table?.seats, table?.you, animations, deckTL, openTL, cardW, st]);
+
+  // remove finished flights
+  useEffect(() => {
+    if (!flights.length) return;
+    const t = setTimeout(() => setFlights((f) => f.slice(-2)), 700);
+    return () => clearTimeout(t);
+  }, [flights]);
+
+  // deal flights to every opponent (your own cards fly in as hand cards)
+  const dealFlights = useMemo<Flight[]>(() => {
+    if (!deal || !tl || !table || !animations) return [];
+    const out: Flight[] = [];
+    const ord = deal.order.length ? deal.order : table.seats.map((s) => s.idx);
+    for (let n = 0; n < tl.total; n++) {
+      const who = ord[n % ord.length];
+      if (who === table.you) continue;
+      const c = seatCentre(who);
+      const delay = RIFFLE_MS + n * tl.gap - (now - deal.at);
+      if (delay + FLY_MS < 0) continue;
+      out.push({ id: `deal${deal.at}-${n}-${opps.length}`, card: null, from: deckTL, to: { x: c.x - cardW / 2, y: c.y - cardW * 0.725 }, delay: Math.max(0, delay), dur: FLY_MS, s1: 0.4, r1: c.x > st.x(600) ? 22 : c.x < st.x(200) ? -22 : 12 });
+    }
+    return out;
+    // rebuilt only when a deal starts or the seats fill in, not on every tick
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deal?.at, opps.length]);
 
   const byId = useMemo(() => new Map((table?.hand ?? []).map((c) => [c.id, c])), [table?.hand]);
   const hand = useMemo(() => order.map((id) => byId.get(id)).filter(Boolean) as Card[], [order, byId]);
-  const slots = useMemo(() => handSlots(hand.map((c) => c.suit), L, grouped), [hand, L, grouped]);
+  const xs = useMemo(() => handXs(hand, grouped).map((x) => st.x(x)), [hand, grouped, st]);
+  const wildRank = table?.wildRank ?? null;
+  const isWild = (c: Card) => c.rank === 'JK' || (!!wildRank && c.rank === wildRank);
+
+  const myPoints = useMemo(() => {
+    if (!wildRank || hand.length < 13) return null;
+    const h = hand as unknown as RCard[];
+    return h.length > 13 ? bestDiscard(h, wildRank as Rank).pointsAfter : arrange(h, wildRank as Rank, 8000).points;
+  }, [hand, wildRank]);
 
   const myTurn = !!table && table.turn === table.you && table.phase === 'playing';
   const mySeat = table?.seats[table.you];
   const out = !!mySeat && mySeat.status !== 'playing';
-  const canDraw = !!table?.canDraw && !busy;
+  const canDraw = !!table?.canDraw && !busy && !dealing;
   const canPickDiscard = !!table?.canDiscard && !discardingId && !busy;
   const canDiscard = canPickDiscard && selected.length === 1;
 
@@ -135,7 +228,7 @@ export default function GameScreen() {
       const from = o.indexOf(id);
       if (from < 0) return o;
       let to = 0, best = Infinity;
-      slots.xs.forEach((x, i) => { const d = Math.abs(x - finalX); if (d < best) { best = d; to = i; } });
+      xs.forEach((x, i) => { const d = Math.abs(x - finalX); if (d < best) { best = d; to = i; } });
       if (to === from) return o;
       const next = [...o];
       next.splice(to, 0, next.splice(from, 1)[0]);
@@ -143,7 +236,7 @@ export default function GameScreen() {
       setGrouped(false);
       return next;
     });
-  }, [slots.xs, tap]);
+  }, [xs, tap]);
 
   const doDraw = useCallback(async (from: 'deck' | 'open') => {
     if (!canDraw) return;
@@ -177,185 +270,178 @@ export default function GameScreen() {
     router.replace('/lobby');
   };
 
-  // ---------- opponents ----------
-  const opps = useMemo(() => {
-    if (!table) return [] as { seat: SeatView; o: Opponent }[];
-    const n = table.seats.length;
-    const list: { seat: SeatView; o: Opponent }[] = [];
-    for (let k = 1; k < n; k++) { const seat = table.seats[(table.you + k) % n]; list.push({ seat, o: toOpponent(seat, table.turn) }); }
-    return list;
-  }, [table]);
-
-  const turnSeat = table && table.turn >= 0 ? table.seats[table.turn] : null;
-  const status = !table ? 'Finding a seat…'
-    : table.phase === 'waiting' ? (table.privateCode ? `Table code ${table.privateCode} · ${table.seats.length}/${table.size} joined` : `Waiting for players · ${table.seats.length}/${table.size}`)
-    : table.phase === 'ended' ? 'Deal over'
-    : out ? 'You are out of this deal · watching'
-    : table.turn < 0 ? 'Dealing cards…'
-    : myTurn ? (table.canDraw ? 'Your turn · draw from the deck or open pile' : selected.length === 1 ? 'Tap Discard or drag the card up to throw it' : 'Select one card to discard')
-    : `${turnSeat?.name ?? 'Opponent'} is playing…`;
-
-  const recent = (table?.recent ?? []).slice(0, -1).map((r) => r.card);
-  const meAsPlayer = { id: me?.id ?? 'me', name: me?.name ?? 'You', initials: initialsOf(me?.name ?? 'You'), color: me?.color ?? '#1F6B4A', chips: me?.chips ?? 0 };
-
   if (!table) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bgTable, alignItems: 'center', justifyContent: 'center', gap: 14 * s }}>
+      <View style={{ flex: 1, backgroundColor: colors.bgTable, alignItems: 'center', justifyContent: 'center', gap: 14 * st.k }}>
         <ActivityIndicator color={colors.gold} />
-        <Text style={{ fontFamily: fonts.uiBold, fontSize: 14 * s, color: colors.textWhite }}>{connected ? 'Finding a seat…' : 'Connecting…'}</Text>
-        <GameButton s={s} variant="outline" label="Back to lobby" width={180} onPress={() => router.replace('/lobby')} />
+        <Text style={{ fontFamily: fonts.uiBold, fontSize: 14 * st.k, color: colors.textWhite }}>{connected ? 'Finding a seat…' : 'Connecting…'}</Text>
+        <GameButton s={st.k} variant="outline" label="Back to lobby" width={180} onPress={() => router.replace('/lobby')} />
       </View>
     );
   }
 
-  const many = opps.length > 3;
-  const topRowY = L.felt.y + 8 * s;
-  const rowW = L.felt.w - 330 * s;
-  const perRow = opps.length > 5 ? Math.ceil(opps.length / 2) : opps.length;
+  // ---------- what to show ----------
+  const turnSeat = table.turn >= 0 ? table.seats[table.turn] : null;
+  const wildLabel = table.wild ? (table.wild.rank === 'JK' ? 'A' : table.wild.rank) : '';
+  const meName = me?.name ?? 'You';
+  const meCode = initialsOf(meName);
+  let status: string;
+  if (table.phase === 'waiting') status = table.privateCode ? `Table code ${table.privateCode} · ${table.seats.length}/${table.size} joined` : `Waiting for players · ${table.seats.length}/${table.size}`;
+  else if (dealing && tl && elapsed < RIFFLE_MS) status = 'Shuffling the deck…';
+  else if (dealing && tl && elapsed < tl.jokerAt) status = table.size === 1 ? 'Dealing your 13 cards…' : `Dealing 13 cards to each of ${table.size} players…`;
+  else if (dealing && tl && elapsed < tl.openLand + 600) status = `Wild joker is ${wildLabel}${table.wild && table.wild.rank !== 'JK' ? table.wild.suit : ''} · every ${wildLabel} is wild`;
+  else if (table.phase === 'ended') status = 'Deal over';
+  else if (out) status = 'You are out of this deal · watching';
+  else if (table.turn < 0) status = 'Dealing cards…';
+  else if (myTurn) status = table.canDraw ? 'Your turn · draw from the deck or open pile' : selected.length === 1 ? 'Tap Discard, or drag the card up onto the table' : 'Select one card to discard';
+  else status = `${turnSeat?.name ?? 'Opponent'}’s turn · thinking…`;
+  const bannerWho = !dealing && turnSeat && !myTurn ? { code: turnSeat.code, color: turnSeat.color } : { code: meCode, color: me?.color ?? '#1F6B4A' };
+  const hot = !dealing && !!turnSeat && !myTurn && table.phase === 'playing';
+
+  // during the deal the seat counters climb as cards land
+  const dealtTo = (idx: number) => {
+    if (!dealing || !tl || !deal) return null;
+    const pos = Math.max(0, deal.order.indexOf(idx));
+    const landed = Math.floor((elapsed - RIFFLE_MS - FLY_MS - pos * tl.gap) / (deal.size * tl.gap)) + 1;
+    return Math.max(0, Math.min(13, landed));
+  };
+
+  const recent = (table.recent ?? []).slice(0, -1);
+  const showDeck = !(dealing && elapsed < RIFFLE_MS);
+  const showJoker = !dealing || (!!tl && elapsed >= tl.jokerAt);
+  const showOpen = !dealing || (!!tl && elapsed >= tl.openLand);
+  const mode = MODE_LABEL[table.mode];
+  const info = `${table.size === 1 ? 'SOLO' : `${table.size} PLAYERS`} · ${table.entry ? formatChips(table.entry) : 'FREE'}`;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgTable }}>
       <SuitPattern />
-      <View style={{ flex: 1, marginLeft: insets.left, marginRight: insets.right, marginTop: insets.top, marginBottom: insets.bottom }}>
-        <GameTable rect={L.felt} s={s} />
+      <Felt st={st} />
 
-        {/* Opponents */}
-        {!many && opps.length === 1 && (
-          <View pointerEvents="none" style={{ position: 'absolute', left: L.topSeat.x, top: L.topSeat.y, width: L.topSeat.w, alignItems: 'center' }}><OpponentPill opponent={opps[0].o} s={s} /></View>
-        )}
-        {!many && opps.length >= 2 && (
-          <>
-            <View style={{ position: 'absolute', left: L.leftSeat.x, top: L.leftSeat.y }}><OpponentPanel opponent={opps[0].o} s={s} /></View>
-            {opps.length === 3 && <View pointerEvents="none" style={{ position: 'absolute', left: L.topSeat.x, top: L.topSeat.y, width: L.topSeat.w, alignItems: 'center' }}><OpponentPill opponent={opps[1].o} s={s} /></View>}
-            <View style={{ position: 'absolute', left: L.rightSeat.x, top: L.rightSeat.y, zIndex: 2 }}><OpponentPanel opponent={opps[opps.length - 1].o} s={s} /></View>
-          </>
-        )}
-        {many && opps.map(({ seat, o }, i) => {
-          const row = i < perRow ? 0 : 1;
-          const col = row === 0 ? i : i - perRow;
-          const count = row === 0 ? perRow : opps.length - perRow;
-          const gap = Math.min(92 * s, rowW / Math.max(1, count));
-          const x = L.felt.x + 150 * s + col * gap + (row === 1 ? gap / 2 : 0);
-          return (
-            <View key={seat.idx} style={{ position: 'absolute', left: x, top: topRowY + row * 74 * s }}>
-              <SeatChip o={o} s={s} active={seat.idx === table.turn} away={!seat.connected} />
-            </View>
-          );
-        })}
+      {opps.map(({ seat, at }) => {
+        const active = seat.idx === table.turn && table.phase === 'playing' && !dealing;
+        const dealt = dealtTo(seat.idx);
+        return (
+          <OpponentSeat key={seat.idx} st={st} at={at} seat={seat} cards={dealt ?? seat.cards} active={active}
+            status={seatStatus(seat, active)} turnSeconds={active && table.deadline ? config?.turnSeconds ?? 30 : undefined} />
+        );
+      })}
 
-        <GameHeader layout={L} onEmote={() => setEmoteOpen(true)} />
-
-        {/* Centre */}
-        <DiscardFan layout={L} cards={recent} />
-        <StatusBanner layout={L} text={status} />
-        {table.wild ? <CardDeck layout={L} joker={table.wild} active={canDraw} onDraw={() => doDraw('deck')} /> : null}
-        {table.open ? <DiscardPile layout={L} card={table.open.card} active={canDraw} onDraw={() => doDraw('open')} /> : null}
-
-        {/* You */}
-        <View style={{ position: 'absolute', left: L.me.x, top: L.me.y, width: 100 * s, alignItems: 'center', gap: 4 * s }}>
-          <PlayerAvatar player={meAsPlayer} size={42 * s} turnSeconds={myTurn && table.deadline ? config?.turnSeconds ?? 30 : undefined} />
-          <Text numberOfLines={1} style={{ fontFamily: fonts.uiHeavy, fontSize: 12 * s, color: colors.textWhite, maxWidth: 96 * s }}>{meAsPlayer.name} (You)</Text>
-          <ChipBalance amount={me?.chips ?? 0} s={s} compact />
-          {bubble ? (
-            <Animated.View entering={FadeInUp.springify()} exiting={FadeOutUp}
-              style={{ position: 'absolute', bottom: 100 * s, left: 0, paddingHorizontal: 12 * s, paddingVertical: 6 * s, borderRadius: 14 * s, backgroundColor: colors.goldBright }}>
-              <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 12 * s, color: colors.goldInk }}>{bubble}</Text>
-            </Animated.View>
-          ) : null}
+      <Tray st={st} recent={recent} seats={table.seats} />
+      <Banner st={st} text={status} who={bannerWho} hot={hot} />
+      {table.phase === 'waiting' && !table.privateCode ? (
+        <View pointerEvents="none" style={{ position: 'absolute', left: st.x(352), top: st.y(170), width: z(214), alignItems: 'center', gap: z(8) }}>
+          <ActivityIndicator color={colors.gold} />
+          <Text style={{ fontFamily: fonts.uiBold, fontSize: z(11), color: '#CFE3D6' }}>AI players fill the empty seats soon</Text>
         </View>
+      ) : (<>
+      <Deck st={st} joker={table.wild} showJoker={showJoker} showDeck={showDeck} can={canDraw} onDraw={() => doDraw('deck')} />
+      <OpenPile st={st} card={showOpen ? table.open?.card ?? null : null} wild={!!table.open && isWild(table.open.card)} can={canDraw && !!table.open} onDraw={() => doDraw('open')} />
+      </>)}
 
-        {/* Hand */}
-        {hand.map((card, i) => (
-          <HandCard
-            key={card.id}
-            card={card}
-            index={i}
-            x={slots.xs[i] ?? L.hand.left}
-            y={L.hand.top}
-            width={L.hand.cardW}
-            lift={L.hand.lift}
-            selected={selected.includes(card.id)}
-            from={entering[card.id]?.from}
-            delay={entering[card.id]?.delay}
-            discardTo={openPoint}
-            discarding={discardingId === card.id}
-            canDiscard={canPickDiscard}
-            animate={animations}
-            onTap={toggleSelect}
-            onDrop={onDrop}
-            onDiscarded={onDiscarded}
-          />
-        ))}
+      <Me st={st} name={meName} initials={meCode} color={me?.color ?? '#1F6B4A'} chips={formatChips(me?.chips ?? 0)}
+        turnSeconds={myTurn && table.deadline && !dealing ? config?.turnSeconds ?? 30 : undefined} />
+      {bubble ? (
+        <Animated.View entering={FadeInUp.springify()} exiting={FadeOutUp} pointerEvents="none"
+          style={{ position: 'absolute', left: st.x(30), top: st.y(262), paddingHorizontal: z(12), paddingVertical: z(6), borderRadius: z(14), backgroundColor: colors.goldBright }}>
+          <Text style={{ fontFamily: fonts.uiHeavy, fontSize: z(12), color: colors.goldInk }}>{bubble}</Text>
+        </Animated.View>
+      ) : null}
 
-        {/* Right rail */}
-        <View style={{ position: 'absolute', left: L.rightCol.x + L.rightCol.w - 40 * s, top: L.felt.y + 14 * s }}>
-          <GameButton s={s} round height={40} variant="outline" accessibilityLabel="Leave table" onPress={() => setLeaveOpen(true)} icon={<LogOut size={18 * s} color={colors.gold} />} />
-        </View>
-        <View pointerEvents="none" style={{ position: 'absolute', left: L.rightCol.x, top: L.felt.y + 64 * s, width: L.rightCol.w, gap: 2 * s }}>
-          <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 10 * s, color: colors.textWhite }}>{MODE_LABEL[table.mode]} · {table.id}</Text>
-          <Text style={{ fontFamily: fonts.uiBold, fontSize: 9 * s, color: colors.gold }}>{table.size === 1 ? 'SOLO' : `${table.size} PLAYERS`} · {table.entry ? formatChips(table.entry) : 'FREE'}</Text>
-          <Text style={{ fontFamily: fonts.uiBold, fontSize: 9 * s, color: colors.textMuted }}>Deck {table.deckCount}</Text>
-        </View>
-        <BottomControls
-          layout={L}
-          canDiscard={canDiscard}
-          onSort={() => { setGrouped(false); setOrder(sortCards(hand).map((c) => c.id)); }}
-          onGroup={() => { setOrder(sortCards(hand).map((c) => c.id)); setGrouped(true); }}
-          onDiscard={() => { if (canDiscard) setDiscardingId(selected[0]); }}
-          onDeclare={() => { if (table.canDiscard) setDeclareOpen(true); else flash('Draw a card first, then Declare.'); }}
+      {hand.map((card, i) => (
+        <HandCard
+          key={card.id}
+          card={card}
+          index={i}
+          x={xs[i] ?? st.x(150)}
+          y={st.y(316)}
+          width={cardW}
+          lift={z(18)}
+          selected={selected.includes(card.id)}
+          wild={isWild(card)}
+          from={entering[card.id]?.from}
+          delay={entering[card.id]?.delay}
+          discardTo={openTL}
+          discarding={discardingId === card.id}
+          canDiscard={canPickDiscard}
+          animate={animations}
+          onTap={toggleSelect}
+          onDrop={onDrop}
+          onDiscarded={onDiscarded}
         />
+      ))}
 
-        {toast ? (
-          <Animated.View entering={FadeIn} pointerEvents="none" style={{ position: 'absolute', alignSelf: 'center', left: 0, right: 0, top: L.status.y - 34 * s, alignItems: 'center' }}>
-            <Text style={{ overflow: 'hidden', paddingHorizontal: 14 * s, paddingVertical: 6 * s, borderRadius: 14 * s, backgroundColor: 'rgba(0,0,0,0.75)', fontFamily: fonts.uiBold, fontSize: 12 * s, color: colors.goldBright }}>{toast}</Text>
-          </Animated.View>
-        ) : null}
+      <RightRail
+        st={st}
+        modeName={mode}
+        info={info}
+        pointsLabel="YOUR POINTS"
+        points={myPoints == null || dealing ? '–' : String(myPoints)}
+        canDiscard={canDiscard}
+        canDeclare={!!table.canDiscard && !busy}
+        onEmote={() => setEmoteOpen(true)}
+        onLeave={() => setLeaveOpen(true)}
+        onSort={() => { tap(); setGrouped(false); setOrder(sortCards(hand).map((c) => c.id)); }}
+        onGroup={() => { tap(); setOrder(sortCards(hand).map((c) => c.id)); setGrouped(true); }}
+        onDiscard={() => { if (canDiscard) setDiscardingId(selected[0]); }}
+        onDeclare={() => setDeclareOpen(true)}
+      />
 
-        {table.phase === 'waiting' && <WaitingRoom table={table} rect={L.felt} s={s} />}
-        {!connected && (
-          <View pointerEvents="none" style={{ position: 'absolute', top: 6 * s, alignSelf: 'center', left: 0, right: 0, alignItems: 'center' }}>
-            <Text style={{ paddingHorizontal: 14 * s, paddingVertical: 5 * s, borderRadius: 12 * s, backgroundColor: 'rgba(200,52,59,0.9)', fontFamily: fonts.uiBold, fontSize: 11 * s, color: '#fff', overflow: 'hidden' }}>Reconnecting… your turns are auto-played until you are back</Text>
-          </View>
-        )}
-      </View>
+      {dealing && elapsed < RIFFLE_MS ? <Riffle st={st} ms={RIFFLE_MS} /> : null}
+      {dealFlights.map((f) => <FlyCard key={f.id} f={f} w={z(62)} />)}
+      {dealing && tl && table.open ? (
+        <FlyCard key={`open${deal?.at}`} f={{ id: 'open', card: table.open.card, from: deckTL, to: openTL, delay: Math.max(0, tl.openAt - elapsed), dur: 300, r0: -10, s1: 0.94 }} w={cardW} />
+      ) : null}
+      {flights.map((f) => <FlyCard key={f.id} f={f} w={cardW} />)}
+
+      {toast ? (
+        <Animated.View entering={FadeIn} pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: st.y(96), alignItems: 'center' }}>
+          <Text style={{ overflow: 'hidden', paddingHorizontal: z(14), paddingVertical: z(6), borderRadius: z(14), backgroundColor: 'rgba(0,0,0,0.75)', fontFamily: fonts.uiBold, fontSize: z(12), color: colors.goldBright }}>{toast}</Text>
+        </Animated.View>
+      ) : null}
+
+      {table.phase === 'waiting' && !!table.privateCode && <WaitingRoom table={table} rect={{ x: st.x(14), y: st.y(12), w: z(806), h: z(408) }} s={st.k} />}
+      {!connected && (
+        <View pointerEvents="none" style={{ position: 'absolute', top: st.y(4), left: 0, right: 0, alignItems: 'center' }}>
+          <Text style={{ paddingHorizontal: z(14), paddingVertical: z(5), borderRadius: z(12), backgroundColor: 'rgba(200,52,59,0.9)', fontFamily: fonts.uiBold, fontSize: z(11), color: '#fff', overflow: 'hidden' }}>Reconnecting… your turns are auto-played until you are back</Text>
+        </View>
+      )}
 
       <AnimatedModal visible={declareOpen} title="DECLARE HAND?" onClose={() => setDeclareOpen(false)} width={460}>
-        <Text style={{ fontFamily: fonts.ui, fontSize: 13 * s, lineHeight: 19 * s, color: colors.text, marginBottom: 16 * s }}>
+        <Text style={{ fontFamily: fonts.ui, fontSize: 13 * st.k, lineHeight: 19 * st.k, color: colors.text, marginBottom: 16 * st.k }}>
           {selected.length === 1
-            ? `You will throw ${label(hand.find((c) => c.id === selected[0]) ?? hand[0])} and show your other 13 cards. The server checks them: you need two sequences, one of them pure. A wrong show costs ${80} points.`
+            ? `You will throw ${label(hand.find((c) => c.id === selected[0]) ?? hand[0])} and show your other 13 cards. The server checks them: you need two sequences, one of them pure. A wrong show costs 80 points.`
             : 'First select the one card you want to throw. Your other 13 cards are then checked.'}
         </Text>
-        <View style={{ flexDirection: 'row', gap: 12 * s }}>
-          <GameButton s={s} variant="outline" label="Keep playing" style={{ flex: 1 }} onPress={() => setDeclareOpen(false)} />
-          <GameButton s={s} label="Declare" style={{ flex: 1 }} disabled={selected.length !== 1} onPress={doDeclare} />
+        <View style={{ flexDirection: 'row', gap: 12 * st.k }}>
+          <GameButton s={st.k} variant="outline" label="Keep playing" style={{ flex: 1 }} onPress={() => setDeclareOpen(false)} />
+          <GameButton s={st.k} label="Declare" style={{ flex: 1 }} disabled={selected.length !== 1} onPress={doDeclare} />
         </View>
       </AnimatedModal>
 
       <AnimatedModal visible={leaveOpen} title="LEAVE TABLE?" onClose={() => setLeaveOpen(false)} width={440}>
-        <Text style={{ fontFamily: fonts.ui, fontSize: 13 * s, lineHeight: 19 * s, color: colors.text, marginBottom: 16 * s }}>
-          {table.phase === 'playing' && !out
-            ? `Leaving now counts as a drop (${table.entry ? 'you pay the drop points' : 'free table'}).`
-            : 'You can leave this table now.'}
+        <Text style={{ fontFamily: fonts.ui, fontSize: 13 * st.k, lineHeight: 19 * st.k, color: colors.text, marginBottom: 16 * st.k }}>
+          {table.phase === 'playing' && !out ? `Leaving now counts as a drop (${table.entry ? 'you pay the drop points' : 'free table'}).` : 'You can leave this table now.'}
         </Text>
-        <View style={{ flexDirection: 'row', gap: 12 * s }}>
-          <GameButton s={s} variant="outline" label="Stay" style={{ flex: 1 }} onPress={() => setLeaveOpen(false)} />
+        <View style={{ flexDirection: 'row', gap: 12 * st.k }}>
+          <GameButton s={st.k} variant="outline" label="Stay" style={{ flex: 1 }} onPress={() => setLeaveOpen(false)} />
           {table.phase === 'playing' && !out && table.size > 1 ? (
-            <GameButton s={s} variant="outline" label="Drop, keep watching" style={{ flex: 1.3 }} onPress={async () => { setLeaveOpen(false); const r = await drop(); if (!r.ok) flash(r.error ?? 'Could not drop'); }} />
+            <GameButton s={st.k} variant="outline" label="Drop, keep watching" style={{ flex: 1.3 }} onPress={async () => { setLeaveOpen(false); const r = await drop(); if (!r.ok) flash(r.error ?? 'Could not drop'); }} />
           ) : null}
-          <GameButton s={s} variant="danger" label="Leave" style={{ flex: 1 }} onPress={exit} />
+          <GameButton s={st.k} variant="danger" label="Leave" style={{ flex: 1 }} onPress={exit} />
         </View>
       </AnimatedModal>
 
       <AnimatedModal visible={emoteOpen} title="QUICK CHAT" onClose={() => setEmoteOpen(false)} width={420}>
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 * s }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 * st.k }}>
           {(config?.quickChat === false ? [] : emotes).map((e) => (
             <Pressable key={e} accessibilityRole="button"
               onPress={() => { setEmoteOpen(false); setBubble(e); chat(e); later(2200, () => setBubble(null)); }}
-              style={{ minHeight: 44, paddingHorizontal: 16 * s, justifyContent: 'center', borderRadius: 22 * s, borderWidth: 1, borderColor: colors.goldLine, backgroundColor: 'rgba(232,198,106,0.08)' }}>
-              <Text style={{ fontFamily: fonts.uiBold, fontSize: 13 * s, color: colors.goldBright }}>{e}</Text>
+              style={{ minHeight: 44, paddingHorizontal: 16 * st.k, justifyContent: 'center', borderRadius: 22 * st.k, borderWidth: 1, borderColor: colors.goldLine, backgroundColor: 'rgba(232,198,106,0.08)' }}>
+              <Text style={{ fontFamily: fonts.uiBold, fontSize: 13 * st.k, color: colors.goldBright }}>{e}</Text>
             </Pressable>
           ))}
-          {config?.quickChat === false && <Text style={{ fontFamily: fonts.ui, fontSize: 13 * s, color: colors.text }}>Quick chat is turned off right now.</Text>}
+          {config?.quickChat === false && <Text style={{ fontFamily: fonts.ui, fontSize: 13 * st.k, color: colors.text }}>Quick chat is turned off right now.</Text>}
         </View>
       </AnimatedModal>
     </View>

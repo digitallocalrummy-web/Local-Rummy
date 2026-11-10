@@ -43,7 +43,8 @@
     "scheme": "localrummy",
     "backgroundColor": "#040705",
     "platforms": [
-      "android"
+      "android",
+      "web"
     ],
     "experiments": {
       "typedRoutes": true

@@ -25,6 +25,8 @@ interface Props {
   width: number;
   lift: number;
   selected: boolean;
+  /** Card has the wild joker's rank: shows the WILD tag. */
+  wild?: boolean;
   /** Where the card enters from (deck or open pile) and after what delay. */
   from?: Point;
   delay?: number;
@@ -164,6 +166,7 @@ export const HandCard = memo(function HandCard(props: Props) {
           card={card}
           width={width}
           highlighted={selected}
+          wild={props.wild}
           style={selected ? styles.lifted : undefined}
         />
       </Animated.View>

@@ -22,11 +22,13 @@ interface Props {
   width: number;
   /** Gold outline when the card is selected. */
   highlighted?: boolean;
+  /** Shows the purple WILD tag (card has the wild joker's rank). */
+  wild?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
 /** A white playing card. Everything inside scales from `width`. */
-export const PlayingCard = memo(function PlayingCard({ card, width, highlighted, style }: Props) {
+export const PlayingCard = memo(function PlayingCard({ card, width, highlighted, wild, style }: Props) {
   const h = width * CARD_RATIO;
   const color = suitColor(card);
   const joker = card.rank === 'JK';
@@ -91,6 +93,11 @@ export const PlayingCard = memo(function PlayingCard({ card, width, highlighted,
           <Text style={{ fontSize: (ace && large ? 40 : 28) * u, color, lineHeight: (ace && large ? 44 : 32) * u }}>{card.suit}</Text>
         )}
       </View>
+      {wild && !joker ? (
+        <View style={{ position: 'absolute', left: 4 * u, top: 42 * u, paddingHorizontal: 3 * u, paddingVertical: 1 * u, borderRadius: 3 * u, backgroundColor: colors.joker }}>
+          <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 7 * u, letterSpacing: 0.5 * u, color: '#fff' }}>WILD</Text>
+        </View>
+      ) : null}
     </View>
   );
 });
