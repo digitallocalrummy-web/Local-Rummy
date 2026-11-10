@@ -9,7 +9,7 @@ export type Config = {
   modes: Record<'points' | 'pool' | 'deals', { enabled: boolean; maxPlayers: number; entries: number[] }>;
   turnSeconds: number; autoDropAfter: number; drops: { first: number; middle: number; full: number };
   printedJokers: boolean; quickChat: boolean; maintenance: boolean; minAppVersion: string;
-  bonus: { day1: number; multipliers: number[] }; refill: number; welcome: number; botFillSeconds: number;
+  bonus: { day1: number; multipliers: number[] }; refill: number; welcome: number; botFillSeconds: number; friendsTables: boolean;
 };
 
 const MODES = [
@@ -124,6 +124,7 @@ export default function GameSetup() {
           ))}
           {rule('Bots fill empty seats after', 'Seconds to wait for real players', <Stepper label="bot wait" value={d.botFillSeconds} min={0} max={120} step={1} suffix="s" onChange={(v) => c.edit((x) => { x.botFillSeconds = v; })} />)}
           {rule('Printed jokers in the deck', 'One per deck, used as wild cards', <Switch label="Printed jokers" on={d.printedJokers} onChange={(v) => c.edit((x) => { x.printedJokers = v; })} />)}
+          {rule('Play with Friends tables', 'Players can create a private table and share a 4-digit code', <Switch label="Play with Friends tables" on={d.friendsTables} onChange={(v) => c.edit((x) => { x.friendsTables = v; })} />)}
           {rule('Quick chat between players', 'Preset messages only, no free text', <Switch label="Quick chat" on={d.quickChat} onChange={(v) => c.edit((x) => { x.quickChat = v; })} />)}
         </Card>
         <Card className="flex flex-[1_1_300px] flex-col gap-3.5" title="Maintenance">

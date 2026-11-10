@@ -14,6 +14,7 @@ import { MODE_LABEL } from '../components/TableSetup';
 import { HandCard, type Point } from '../game/HandCard';
 import { BottomControls, CardDeck, DiscardFan, DiscardPile, GameHeader, GameTable, StatusBanner } from '../game/TableParts';
 import { handSlots, useGameLayout } from '../game/useGameLayout';
+import { WaitingRoom } from '../game/WaitingRoom';
 import { useLayout } from '../hooks/useLayout';
 import { initialsOf, useSession, type SeatView, type TableEvent } from '../net/session';
 import { useSettings } from '../state/settings';
@@ -187,7 +188,7 @@ export default function GameScreen() {
 
   const turnSeat = table && table.turn >= 0 ? table.seats[table.turn] : null;
   const status = !table ? 'Finding a seat…'
-    : table.phase === 'waiting' ? `Waiting for players · ${table.seats.length}/${table.size}`
+    : table.phase === 'waiting' ? (table.privateCode ? `Table code ${table.privateCode} · ${table.seats.length}/${table.size} joined` : `Waiting for players · ${table.seats.length}/${table.size}`)
     : table.phase === 'ended' ? 'Deal over'
     : out ? 'You are out of this deal · watching'
     : table.turn < 0 ? 'Dealing cards…'
@@ -310,13 +311,7 @@ export default function GameScreen() {
           </Animated.View>
         ) : null}
 
-        {table.phase === 'waiting' && (
-          <View style={{ position: 'absolute', left: L.felt.x, top: L.felt.y, width: L.felt.w, height: L.felt.h, alignItems: 'center', justifyContent: 'center', gap: 10 * s }}>
-            <ActivityIndicator color={colors.gold} />
-            <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 15 * s, color: colors.textWhite }}>Waiting for players · {table.seats.length}/{table.size}</Text>
-            <Text style={{ fontFamily: fonts.ui, fontSize: 12 * s, color: colors.textMuted }}>AI players fill the empty seats in a few seconds</Text>
-          </View>
-        )}
+        {table.phase === 'waiting' && <WaitingRoom table={table} rect={L.felt} s={s} />}
         {!connected && (
           <View pointerEvents="none" style={{ position: 'absolute', top: 6 * s, alignSelf: 'center', left: 0, right: 0, alignItems: 'center' }}>
             <Text style={{ paddingHorizontal: 14 * s, paddingVertical: 5 * s, borderRadius: 12 * s, backgroundColor: 'rgba(200,52,59,0.9)', fontFamily: fonts.uiBold, fontSize: 11 * s, color: '#fff', overflow: 'hidden' }}>Reconnecting… your turns are auto-played until you are back</Text>

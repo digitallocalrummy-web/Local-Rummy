@@ -8,7 +8,7 @@ import { Avatar, Button, Card, Chips, Empty, Kpi, Label, Pill, SuitCard, Table, 
 export const TableStatus = ({ s }: { s: string }) =>
   s === 'stuck' ? <Pill tone="bad">Stuck</Pill> : s === 'waiting' ? <Pill tone="info">Waiting</Pill> : s === 'ended' ? <Pill>Ended</Pill> : <Pill tone="ok">Playing</Pill>;
 
-type F = 'all' | 'playing' | 'waiting' | 'stuck';
+type F = 'all' | 'playing' | 'waiting' | 'stuck' | 'friends';
 
 export default function LiveTables() {
   const qc = useQueryClient();
@@ -24,7 +24,7 @@ export default function LiveTables() {
   const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null);
   const q = useQuery({ queryKey: ['tables'], queryFn: () => api('/api/admin/tables'), refetchInterval: 2_000 });
   const all: any[] = q.data?.tables ?? [];
-  const rows = all.filter((t) => f === 'all' || t.status === f);
+  const rows = all.filter((t) => f === 'all' || (f === 'friends' ? !!t.privateCode : t.status === f));
   const t = all.find((x) => x.id === sel) ?? rows[0];
   const act = useMutation({
     mutationFn: ({ path, body }: { path: string; body?: object }) => api(`/api/admin/tables/${t.id}/${path}`, { body: body ?? {} }),
@@ -40,7 +40,7 @@ export default function LiveTables() {
         <Kpi label="Average wait for a seat" value={`${q.data?.avgWaitSecs ?? 0} s`} />
         <Kpi label="Stuck tables" value={<span className={q.data?.stuck ? 'text-bad' : ''}>{q.data?.stuck ?? 0}</span>} />
       </section>
-      <Chips label="Filter tables" value={f} onChange={setF} options={[{ value: 'all', label: 'All tables' }, { value: 'playing', label: 'Playing' }, { value: 'waiting', label: 'Waiting for players' }, { value: 'stuck', label: 'Stuck' }]} />
+      <Chips label="Filter tables" value={f} onChange={setF} options={[{ value: 'all', label: 'All tables' }, { value: 'playing', label: 'Playing' }, { value: 'waiting', label: 'Waiting for players' }, { value: 'stuck', label: 'Stuck' }, { value: 'friends', label: 'Friends tables' }]} />
       <section className="flex flex-wrap items-start gap-4">
         <Card className="flex-[999_1_560px] !p-2">
           <ul className="m-0 flex list-none flex-col gap-1.5 p-0 md:hidden">
@@ -48,7 +48,7 @@ export default function LiveTables() {
               <li key={x.id}>
                 <button onClick={() => pick(x.id)} className={cx('flex w-full cursor-pointer items-center gap-3 rounded-xl border p-3 text-left text-text', x.id === t?.id ? 'border-gold/45 bg-raised' : 'border-transparent bg-transparent')}>
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <b className="text-sm">{x.id} · {MODE_NAMES[x.mode]}</b>
+                    <b className="text-sm">{x.id} · {MODE_NAMES[x.mode]}{x.privateCode ? ` · Friends ${x.privateCode}` : ''}</b>
                     <span className="text-xs text-mute">{x.seated}/{x.size} seats · {x.entry ? `entry ${fmt(x.entry)}` : 'free'} · {x.turnCount} turns</span>
                   </span>
                   <TableStatus s={x.status} />
@@ -61,7 +61,7 @@ export default function LiveTables() {
           <Table head={['Table', 'Mode', 'Seats', 'Entry', 'Turns', 'Running', 'Status']} empty={!rows.length && <Empty>No tables here right now. Tables appear when players sit down in the app.</Empty>}>
             {rows.map((x) => (
               <tr key={x.id} className={cx(x.id === t?.id && '[&_td]:bg-gold/7')}>
-                <td><button onClick={() => pick(x.id)} className="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-extrabold text-text underline decoration-line2 underline-offset-[3px] hover:text-gold2" aria-label={`Open table ${x.id}`}>{x.id}</button></td>
+                <td className="whitespace-nowrap"><button onClick={() => pick(x.id)} className="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-extrabold text-text underline decoration-line2 underline-offset-[3px] hover:text-gold2" aria-label={`Open table ${x.id}`}>{x.id}</button>{x.privateCode && <span className="ml-2"><Pill tone="gold">Friends · {x.privateCode}</Pill></span>}</td>
                 <td>{MODE_NAMES[x.mode]}</td>
                 <td><span className="inline-flex items-center gap-2"><span className="inline-block h-1.5 w-[70px] rounded-[3px] bg-track"><span className="block h-full rounded-[3px] bg-gold" style={{ width: `${(x.seated / x.size) * 100}%` }} /></span>{x.seated} / {x.size}</span></td>
                 <td className="font-bold text-gold2">{x.entry ? fmt(x.entry) : 'Free'}</td><td>{x.turnCount}</td>
@@ -73,7 +73,7 @@ export default function LiveTables() {
         </Card>
         {t && (
           <aside ref={panel} aria-label="Table details" className="scroll-mt-16 flex min-w-0 flex-[1_1_340px] flex-col gap-3.5 rounded-[14px] border border-line bg-panel p-5">
-            <div className="flex items-center gap-2.5"><div className="min-w-0 flex-1"><b className="text-xl">Table {t.id}</b><span className="block text-xs text-mute">{MODE_NAMES[t.mode]} · entry {t.entry ? fmt(t.entry) : 'free'} · {t.humans} real player{t.humans === 1 ? '' : 's'}</span></div><TableStatus s={t.status} /></div>
+            <div className="flex items-center gap-2.5"><div className="min-w-0 flex-1"><b className="text-xl">Table {t.id}</b><span className="block text-xs text-mute">{MODE_NAMES[t.mode]} · entry {t.entry ? fmt(t.entry) : 'free'} · {t.humans} real player{t.humans === 1 ? '' : 's'}{t.privateCode ? ` · friends table, code ${t.privateCode}` : ''}</span></div><TableStatus s={t.status} /></div>
             <div className="flex gap-2.5">
               {[['Wild joker', <SuitCard key="w" c={t.wild} />], ['Open card', <SuitCard key="o" c={t.open} />], ['Deck left', <b key="d" className="text-white">{t.deckCount}</b>]].map(([l, v], i) => (
                 <div key={i} className="flex-1 rounded-[10px] border border-[#1E6B45] bg-felt px-3 py-2.5"><Label className="!text-[#CFE3D6]">{l}</Label><span className="mt-0.5 block text-lg">{v}</span></div>

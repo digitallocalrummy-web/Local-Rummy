@@ -10,6 +10,9 @@
  *   drop      {}
  *   leave     {}
  *   chat      { text }
+ *   private:create { mode, players, entry }  open a Play with Friends table → { code }
+ *   private:join   { code }                  join a friend's table
+ *   private:start  { fillAi }                host starts (empty seats get AI, or the table shrinks)
  * Server → client:
  *   table     personal view of the table (hand, seats, open card, turn, result)
  *   event     animation events (dealt, drew, discarded, turn, dropped, declared, ended, chat)
@@ -17,6 +20,7 @@
  *   config    public game settings, sent again whenever an admin publishes
  */
 import { eq, sql } from 'drizzle-orm';
+import { randomInt } from 'node:crypto';
 import type { Server, Socket } from 'socket.io';
 import { verifyPlayer } from '../auth';
 import { configEvents, getConfig, MODE_IDS, publicConfig, type ModeId } from '../config';
@@ -87,8 +91,8 @@ async function pushWallet(playerId: string) {
   if (p) io?.to(playerRoom(playerId)).emit('wallet', { chips: p.chips });
 }
 
-/** Finds an open table with the same mode, size and entry, or opens a new one. */
-async function seat(playerId: string, mode: ModeId, size: number, entry: number) {
+/** Checks shared by quick seating and private tables. */
+async function checkSeat(playerId: string, mode: ModeId, size: number, entry: number) {
   const cfg = getConfig();
   if (cfg.maintenance) throw new Error('Local Rummy is under maintenance. Please try again soon.');
   const m = cfg.modes[mode];
@@ -97,34 +101,83 @@ async function seat(playerId: string, mode: ModeId, size: number, entry: number)
   // entry 0 = free practice table (always allowed); otherwise one of the admin's tiers
   if (size === 1) entry = 0;
   else if (entry !== 0 && !m.entries.includes(entry)) throw new Error('That entry amount is not offered.');
+  return { cfg, entry };
+}
 
+async function loadPlayer(playerId: string) {
   const existing = playerTable.get(playerId);
   if (existing && tables.get(existing)?.phase !== 'ended') throw new Error('You are already at a table.');
-
   const p = await db.query.players.findFirst({ where: eq(schema.players.id, playerId) });
   if (!p) throw new Error('Player not found.');
   if (p.status === 'blocked') throw new Error('Your account is blocked. Contact support.');
+  return p;
+}
 
-  let t = [...tables.values()].find((x) => x.phase === 'waiting' && x.mode === mode && x.size === size && x.entry === entry && !x.isFull);
-  const fresh = !t;
-  if (!t) t = new Table(mode, size, entry, cfg, hooks);
+/** Takes the entry and sits the player down at `t`. Registers `t` if it is new. */
+async function sitDown(p: typeof schema.players.$inferSelect, t: Table, fresh: boolean) {
+  const entry = t.entry;
   if (entry > 0) {
-    try { await moveChips(playerId, -entry, 'entry', { tableCode: t.id, note: `${mode} · ${size} players` }); }
+    try { await moveChips(p.id, -entry, 'entry', { tableCode: t.id, note: `${t.mode} · ${t.size} players${t.privateCode ? ' · private' : ''}` }); }
     catch (e) { if (e instanceof InsufficientChips) throw new Error(`This table needs ${entry} chips.`); throw e; }
   }
   // the table may have filled up while the chips moved
   if (t.phase !== 'waiting' || t.isFull) {
-    if (entry > 0) await moveChips(playerId, entry, 'refund', { tableCode: t.id, note: 'Table filled up' });
+    if (entry > 0) await moveChips(p.id, entry, 'refund', { tableCode: t.id, note: 'Table filled up' });
     throw new Error('That table just filled up. Please try again.');
   }
   if (fresh) tables.set(t.id, t);
   const initials = p.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'LR';
+  playerTable.set(p.id, t.id);
   t.addHuman({ id: p.id, name: p.name, code: initials, color: p.color }, entry);
-  playerTable.set(playerId, t.id);
-  if (entry > 0) await pushWallet(playerId);
+  if (entry > 0) await pushWallet(p.id);
+}
+
+/** Finds an open public table with the same mode, size and entry, or opens a new one. */
+async function seat(playerId: string, mode: ModeId, size: number, entryIn: number) {
+  const { cfg, entry } = await checkSeat(playerId, mode, size, entryIn);
+  const p = await loadPlayer(playerId);
+  let t = [...tables.values()].find((x) => !x.privateCode && x.phase === 'waiting' && x.mode === mode && x.size === size && x.entry === entry && !x.isFull);
+  const fresh = !t;
+  if (!t) t = new Table(mode, size, entry, cfg, hooks);
+  await sitDown(p, t, fresh);
   // fill the empty seats with bots if no one else turns up soon
   const tt = t;
   if (tt.phase === 'waiting') setTimeout(() => { if (tt.phase === 'waiting') tt.fillWithBots(); }, cfg.botFillSeconds * 1000);
+  return t;
+}
+
+const PRIVATE_WAIT_MS = 15 * 60_000;
+
+/** Play with Friends: opens a private table and returns it with its 4-digit code. */
+async function openPrivate(playerId: string, mode: ModeId, size: number, entryIn: number) {
+  if (!getConfig().friendsTables) throw new Error('Private tables are turned off right now.');
+  if (size < 2) throw new Error('A table with friends needs at least 2 players.');
+  const { cfg, entry } = await checkSeat(playerId, mode, size, entryIn);
+  const p = await loadPlayer(playerId);
+  const used = new Set([...tables.values()].map((x) => x.privateCode).filter(Boolean));
+  let code = '';
+  do code = String(randomInt(1000, 10000)); while (used.has(code));
+  const t = new Table(mode, size, entry, cfg, hooks);
+  t.privateCode = code;
+  t.hostId = playerId;
+  await sitDown(p, t, true);
+  // close a private table nobody started after 15 minutes and give the entries back
+  setTimeout(() => {
+    if (t.phase !== 'waiting') return;
+    for (const s of t.humans) if (s.playerId) leaveWaiting(s.playerId, t).catch(() => {});
+  }, PRIVATE_WAIT_MS);
+  return t;
+}
+
+async function joinPrivate(playerId: string, codeIn: string) {
+  const code = codeIn.replace(/\D/g, '');
+  const t = [...tables.values()].find((x) => x.privateCode === code && x.phase !== 'ended');
+  if (!t) throw new Error('No table with that code. Check the number with your friend.');
+  if (t.phase !== 'waiting') throw new Error('That game has already started.');
+  if (t.isFull) throw new Error('That table is full.');
+  if (getConfig().maintenance) throw new Error('Local Rummy is under maintenance. Please try again soon.');
+  const p = await loadPlayer(playerId);
+  await sitDown(p, t, false);
   return t;
 }
 
@@ -132,8 +185,11 @@ async function leaveWaiting(playerId: string, t: Table) {
   const s = t.removeWaiting(playerId);
   playerTable.delete(playerId);
   if (s?.escrow) { await moveChips(playerId, s.escrow, 'refund', { tableCode: t.id, note: 'Left before the deal' }); await pushWallet(playerId); }
-  if (!t.seats.some((x) => x.kind === 'human')) { t.dispose(); tables.delete(t.id); }
-  else hooks.onChange(t);
+  const left = t.seats.filter((x) => x.kind === 'human');
+  if (!left.length) { t.dispose(); tables.delete(t.id); return; }
+  // the host left a private table: the next friend becomes host
+  if (t.hostId === playerId) t.hostId = left[0].playerId ?? null;
+  hooks.onChange(t);
 }
 
 type Ack = (res: Record<string, unknown>) => void;
@@ -174,6 +230,38 @@ export function attachSockets(server: Server) {
         hooks.onChange(t);
         done({ ok: true, tableId: t.id });
       } catch (e) { done({ ok: false, error: (e as Error).message }); }
+    });
+
+    socket.on('private:create', async (msg: { mode?: string; players?: number; entry?: number }, ack) => {
+      const done = safeAck(ack);
+      try {
+        const mode = MODE_IDS.includes(msg?.mode as ModeId) ? (msg.mode as ModeId) : null;
+        if (!mode) throw new Error('Unknown game mode.');
+        const t = await openPrivate(playerId, mode, Math.floor(Number(msg.players)), Math.floor(Number(msg.entry ?? 0)));
+        socket.join(room(t));
+        hooks.onChange(t);
+        done({ ok: true, tableId: t.id, code: t.privateCode });
+      } catch (e) { done({ ok: false, error: (e as Error).message }); }
+    });
+
+    socket.on('private:join', async (msg: { code?: string }, ack) => {
+      const done = safeAck(ack);
+      try {
+        const t = await joinPrivate(playerId, String(msg?.code ?? ''));
+        socket.join(room(t));
+        hooks.onChange(t);
+        done({ ok: true, tableId: t.id });
+      } catch (e) { done({ ok: false, error: (e as Error).message }); }
+    });
+
+    socket.on('private:start', (msg: { fillAi?: boolean }, ack) => {
+      const done = safeAck(ack);
+      const t = current();
+      if (!t?.privateCode) return done({ ok: false, error: 'You are not at a private table.' });
+      if (t.hostId !== playerId) return done({ ok: false, error: 'Only the host can start the game.' });
+      const err = t.startNow(!!msg?.fillAi);
+      if (!err) hooks.onChange(t);
+      done(err ? { ok: false, error: err } : { ok: true });
     });
 
     socket.on('rejoin', (_m, ack) => {

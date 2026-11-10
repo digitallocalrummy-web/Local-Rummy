@@ -23,6 +23,7 @@ export const configSchema = z.object({
   refill: z.number().int().min(0).max(100_000),
   welcome: z.number().int().min(0).max(1_000_000),
   botFillSeconds: z.number().int().min(0).max(120),
+  friendsTables: z.boolean(),
 });
 export type GameConfig = z.infer<typeof configSchema>;
 export type ModeId = keyof GameConfig['modes'];
@@ -45,6 +46,7 @@ export const defaultConfig: GameConfig = {
   refill: 500,
   welcome: 2000,
   botFillSeconds: 4,
+  friendsTables: true,
 };
 
 let current: GameConfig = defaultConfig;
@@ -85,6 +87,7 @@ export function publicConfig(c = current) {
     turnSeconds: c.turnSeconds,
     printedJokers: c.printedJokers,
     quickChat: c.quickChat,
+    friendsTables: c.friendsTables,
     maintenance: c.maintenance,
     minAppVersion: c.minAppVersion,
     bonus: c.bonus,

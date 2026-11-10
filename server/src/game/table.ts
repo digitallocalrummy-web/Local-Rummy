@@ -80,12 +80,17 @@ export class Table {
   startedAt = 0;
   lastActionAt = Date.now();
   result: TableResult | null = null;
+  /** Set for Play with Friends tables: the code friends type to join. Never matched by quick seating. */
+  privateCode: string | null = null;
+  /** Player who created a private table; only they can start it. */
+  hostId: string | null = null;
   private timers = new Set<NodeJS.Timeout>();
   private turnTimer: NodeJS.Timeout | null = null;
 
   constructor(
     readonly mode: ModeId,
-    readonly size: number,
+    /** Seats at the table. A private table can shrink to the players present when the host starts early. */
+    public size: number,
     readonly entry: number,
     readonly cfg: GameConfig,
     private hooks: TableHooks,
@@ -126,6 +131,19 @@ export class Table {
       this.seats.push({ idx: this.seats.length, kind: 'bot', name, code, color, hand: [], status: 'playing', drawn: false, missed: 0, moves: 0, connected: true, escrow: 0 });
     }
     if (this.isFull) this.start();
+  }
+
+  /**
+   * Private tables: the host starts the deal. With fillAi the empty seats get AI players;
+   * otherwise the table shrinks to the people already seated (at least 2).
+   */
+  startNow(fillAi: boolean): string | null {
+    if (this.phase !== 'waiting') return 'The game has already started.';
+    if (fillAi) { this.fillWithBots(); return null; }
+    if (this.seats.length < 2) return 'Wait for at least one friend, or start with AI players.';
+    this.size = this.seats.length;
+    this.start();
+    return null;
   }
 
   private start() {
@@ -358,6 +376,8 @@ export class Table {
       id: this.id,
       mode: this.mode,
       size: this.size,
+      privateCode: this.privateCode,
+      host: this.hostId ? this.seats.findIndex((x) => x.playerId === this.hostId) : -1,
       entry: this.entry,
       phase: this.phase,
       you: forSeat,
@@ -383,7 +403,7 @@ export class Table {
   adminView() {
     const stuck = this.phase === 'playing' && Date.now() - this.lastActionAt > 5 * 60_000;
     return {
-      id: this.id, mode: this.mode, size: this.size, entry: this.entry, phase: this.phase,
+      id: this.id, mode: this.mode, size: this.size, entry: this.entry, phase: this.phase, privateCode: this.privateCode,
       status: this.phase === 'waiting' ? 'waiting' : stuck ? 'stuck' : this.phase,
       seated: this.seats.length, humans: this.humans.length,
       startedAt: this.startedAt || null, createdAt: this.createdAt, lastActionAt: this.lastActionAt,

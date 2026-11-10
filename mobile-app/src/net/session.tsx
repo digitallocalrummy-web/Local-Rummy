@@ -16,7 +16,7 @@ export type ModeId = 'points' | 'pool' | 'deals';
 export interface ModeConfig { enabled: boolean; maxPlayers: number; entries: number[] }
 export interface PublicConfig {
   modes: Record<ModeId, ModeConfig>;
-  turnSeconds: number; quickChat: boolean; maintenance: boolean; minAppVersion: string;
+  turnSeconds: number; quickChat: boolean; maintenance: boolean; minAppVersion: string; friendsTables?: boolean;
   bonus: { day1: number; multipliers: number[] };
 }
 export interface Me {
@@ -33,6 +33,8 @@ export interface SeatResult { idx: number; name: string; code: string; color: st
 export interface TableResult { winnerIdx: number | null; reason: string; seats: SeatResult[] }
 export interface TableView {
   id: string; mode: ModeId; size: number; entry: number; phase: 'waiting' | 'playing' | 'ended'; you: number;
+  /** Play with Friends: the code to share, and which seat is the host (-1 for public tables). */
+  privateCode: string | null; host: number;
   hand: Card[]; canDraw: boolean; canDiscard: boolean; seats: SeatView[];
   open: { card: Card; by: number } | null; recent: { card: Card; by: number }[]; deckCount: number;
   wild: Card | null; wildRank: string | null; turn: number; deadline: number | null; result: TableResult | null;
@@ -62,6 +64,9 @@ interface SessionValue {
   refill: () => Promise<{ amount: number; chips: number }>;
   rename: (name: string) => Promise<void>;
   seat: (mode: ModeId, players: number, entry: number) => Promise<Ack>;
+  createPrivate: (mode: ModeId, players: number, entry: number) => Promise<Ack>;
+  joinPrivate: (code: string) => Promise<Ack>;
+  startPrivate: (fillAi: boolean) => Promise<Ack>;
   draw: (from: 'deck' | 'open') => Promise<Ack>;
   discard: (cardId: string) => Promise<Ack>;
   declare: (cardId: string) => Promise<Ack>;
@@ -191,6 +196,15 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setTable(null); tableRef.current = null; setLastResult(null);
       return emit('seat', { mode, players, entry });
     },
+    createPrivate: async (mode, players, entry) => {
+      setTable(null); tableRef.current = null; setLastResult(null);
+      return emit('private:create', { mode, players, entry });
+    },
+    joinPrivate: async (code) => {
+      setTable(null); tableRef.current = null; setLastResult(null);
+      return emit('private:join', { code });
+    },
+    startPrivate: (fillAi) => emit('private:start', { fillAi }),
     draw: (from) => emit('draw', { from }),
     discard: (cardId) => emit('discard', { cardId }),
     declare: (cardId) => emit('declare', { cardId }),

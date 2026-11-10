@@ -10,13 +10,16 @@ import { GameButton } from './GameButton';
 
 export const MODE_LABEL: Record<ModeId, string> = { points: 'POINTS', pool: 'POOL 101', deals: 'DEALS' };
 
-/** Choose players (1–max) and entry, then sit down at a server table. */
-export function TableSetup({ s, mode, free, onClose }: { s: number; mode: ModeId | null; free?: boolean; onClose: () => void }) {
-  const { config, me, seat } = useSession();
+/**
+ * Choose players and entry, then sit down at a server table.
+ * With `privateTable` it opens a Play with Friends table instead and shows its code on the game screen.
+ */
+export function TableSetup({ s, mode, free, privateTable, onClose }: { s: number; mode: ModeId | null; free?: boolean; privateTable?: boolean; onClose: () => void }) {
+  const { config, me, seat, createPrivate } = useSession();
   const { tap } = useSettings();
   const m = mode ? config?.modes[mode] : null;
   // the lobby remounts this (key) for each mode, so these start fresh every time
-  const [players, setPlayers] = useState(() => Math.min(4, m?.maxPlayers ?? 4));
+  const [players, setPlayers] = useState(() => Math.min(privateTable ? 2 : 4, m?.maxPlayers ?? 4));
   const [entry, setEntry] = useState(() => (free ? 0 : m?.entries[0] ?? 0));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -27,9 +30,9 @@ export function TableSetup({ s, mode, free, onClose }: { s: number; mode: ModeId
 
   const start = async () => {
     setBusy(true); setError(null);
-    const r = await seat(mode, players, cost);
+    const r = privateTable ? await createPrivate(mode, players, cost) : await seat(mode, players, cost);
     setBusy(false);
-    if (!r.ok) { setError(r.error ?? 'Could not find a table.'); return; }
+    if (!r.ok) { setError(r.error ?? (privateTable ? 'Could not create the table.' : 'Could not find a table.')); return; }
     tap('success');
     onClose();
     router.push('/game');
@@ -43,11 +46,11 @@ export function TableSetup({ s, mode, free, onClose }: { s: number; mode: ModeId
   );
 
   return (
-    <AnimatedModal visible title={`TABLE SETUP · ${MODE_LABEL[mode]}`} onClose={onClose} width={560}>
+    <AnimatedModal visible title={`${privateTable ? 'TABLE WITH FRIENDS' : 'TABLE SETUP'} · ${MODE_LABEL[mode]}`} onClose={onClose} width={560}>
       <View style={{ gap: 12 * s }}>
         <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 11 * s, letterSpacing: 1.2, color: colors.textMutedBlue }}>PLAYERS AT THE TABLE (INCLUDING YOU)</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 * s }}>
-          {Array.from({ length: m.maxPlayers }, (_, i) => i + 1).map((n) => chip(String(n), n === players, () => setPlayers(n), `${n} players`))}
+          {Array.from({ length: m.maxPlayers }, (_, i) => i + 1).filter((n) => !privateTable || n >= 2).map((n) => chip(String(n), n === players, () => setPlayers(n), `${n} players`))}
         </View>
         {players > 1 && !free && (
           <>
@@ -59,15 +62,17 @@ export function TableSetup({ s, mode, free, onClose }: { s: number; mode: ModeId
           </>
         )}
         <Text style={{ fontFamily: fonts.ui, fontSize: 12 * s, color: colors.text }}>
-          {players === 1 ? 'Solo practice · just you and the deck · free'
+          {privateTable
+            ? `Up to ${players} players · ${cost ? `entry ${formatChips(cost)} each` : 'free table'} · you get a code to share with friends, then start when everyone has joined`
+            : players === 1 ? 'Solo practice · just you and the deck · free'
             : `You + ${players - 1} opponent${players > 2 ? 's' : ''} · ${players > 6 ? 3 : 2} decks · ${cost ? `entry ${formatChips(cost)}, you can lose up to this` : 'free table'}`}
-          {players > 1 ? ' · empty seats are filled with AI players' : ''}
+          {!privateTable && players > 1 ? ' · empty seats are filled with AI players' : ''}
         </Text>
         {short && <Text style={{ fontFamily: fonts.uiBold, fontSize: 12 * s, color: '#F2A9A9' }}>You need {formatChips(cost)} chips. Collect your daily bonus or pick a lower entry.</Text>}
         {error && <Text style={{ fontFamily: fonts.uiBold, fontSize: 12 * s, color: '#F2A9A9' }}>{error}</Text>}
         <View style={{ flexDirection: 'row', gap: 12 * s }}>
           <GameButton s={s} variant="outline" label="Cancel" style={{ flex: 1 }} onPress={onClose} />
-          <GameButton s={s} label={busy ? 'FINDING A SEAT…' : 'START GAME'} style={{ flex: 1 }} disabled={busy || short} onPress={start} />
+          <GameButton s={s} label={busy ? (privateTable ? 'CREATING…' : 'FINDING A SEAT…') : privateTable ? 'CREATE TABLE' : 'START GAME'} style={{ flex: 1 }} disabled={busy || short} onPress={start} />
         </View>
       </View>
     </AnimatedModal>

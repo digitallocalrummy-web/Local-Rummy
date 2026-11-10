@@ -10,6 +10,7 @@ import { GameButton } from '../components/GameButton';
 import { GameModeCard } from '../components/GameModeCard';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { gameModes } from '../data/sample';
+import { FriendsPanel } from '../components/FriendsPanel';
 import { MODE_LABEL, TableSetup } from '../components/TableSetup';
 import { initialsOf, needsUpdate, useSession, type ModeId } from '../net/session';
 import { useLayout } from '../hooks/useLayout';
@@ -149,13 +150,7 @@ export default function Lobby() {
 
             <View key={tab} style={{ flexDirection: 'row', gap: 12 * s, flex: 1 }}>
               {friends ? (
-                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 8 * s }}>
-                  <Users size={30 * s} color={colors.gold} />
-                  <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 15 * s, color: colors.textWhite }}>Private tables are coming next</Text>
-                  <Text style={{ fontFamily: fonts.ui, fontSize: 12 * s, color: colors.textMutedBlue, textAlign: 'center', maxWidth: 360 * s }}>
-                    Soon you can share a table code with friends. For now, pick a table in Play for Fun or Quick Play.
-                  </Text>
-                </View>
+                <FriendsPanel s={s} onCreate={(id) => setSetup(id)} />
               ) : modes.length ? (
                 modes.map((m, i) => (
                   <GameModeCard key={m.id} mode={m} index={i} s={s} onPlay={() => { tap(); setSetup(m.id); }} />
@@ -219,7 +214,7 @@ export default function Lobby() {
         </View>
       </AnimatedModal>
 
-      <TableSetup key={`${setup}-${practice}`} s={s} mode={setup} free={practice} onClose={() => setSetup(null)} />
+      <TableSetup key={`${setup}-${practice}-${friends}`} s={s} mode={setup} free={practice} privateTable={friends} onClose={() => setSetup(null)} />
       <ConnectionGate s={s} />
     </View>
   );
