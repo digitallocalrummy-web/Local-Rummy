@@ -60,42 +60,54 @@ export default function Splash() {
   const enterStyle = useAnimatedStyle(() => ({ opacity: enter.value, transform: [{ translateY: (1 - enter.value) * rise }] }));
   const ringStyle = useAnimatedStyle(() => ({ opacity: 0.5 * (1 - pulse.value), transform: [{ scaleX: 1 + pulse.value * 0.14 }, { scaleY: 1 + pulse.value * 0.5 }] }));
 
-  // photo is 1236×853; cover the screen width and keep the top (her face) in view
-  const heroH = Math.max(L.H, (L.W * 853) / 1236);
-  const heroTop = -(heroH - L.H) * 0.15;
-  // fade starts a little left of the logo column
-  const fadeFrom = Math.max(0, (st.x(560)) / L.W);
-  const fadeMid = Math.min(0.95, st.x(660) / L.W);
+  // photo is 1236×853: full height on the left, width follows
+  const imgW = (L.H * 1236) / 853;
+  // title column: the space right of the photo, but never narrower than 300 stage units
+  const brandW = Math.max(z(300), L.W - imgW * 0.9 - L.insets.right);
+  const brandLeft = L.W - L.insets.right - brandW;
+  const fadeFrom = Math.max(0, Math.min(0.9, (brandLeft - z(170)) / L.W));
+  const fadeTo = Math.max(fadeFrom + 0.05, Math.min(0.97, (brandLeft + z(30)) / L.W));
   const play = () => { tap('success'); router.replace('/lobby'); };
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0E0B06', overflow: 'hidden' }}>
-      {/* hostess photo across the full screen, anchored near the top so her face stays in view */}
-      <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, top: heroTop, width: L.W, height: heroH }, heroStyle]}>
+      {/* soft, blurred copy of the photo fills the whole screen, so the title sits on the same scene */}
+      <Image source={HOSTESS} resizeMode="cover" blurRadius={22} style={{ position: 'absolute', left: 0, top: 0, width: L.W, height: L.H }} />
+
+      {/* the sharp photo, always shown top to bottom so her face and hair are never cut */}
+      <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, top: 0, width: imgW, height: L.H }, heroStyle]}>
         <Image source={HOSTESS} resizeMode="cover" style={{ width: '100%', height: '100%' }}
           accessibilityLabel="Local Rummy hostess beside an emerald card table under a gold chandelier" />
       </Animated.View>
 
-      {/* darken the right side behind the logo, and the bottom edge (gradients live in the same Svg: Android needs that) */}
+      {/* one smooth dark wash from the photo into the title side, plus a soft bottom edge
+          (gradients live in the same Svg: on Android a gradient from another Svg draws black) */}
       <Svg pointerEvents="none" width={L.W} height={L.H} style={{ position: 'absolute', left: 0, top: 0 }}>
         <Defs>
           <LinearGradient id="splash-r" x1="0" y1="0" x2="1" y2="0">
             <Stop offset="0" stopColor="#0E0B06" stopOpacity={0} />
             <Stop offset={String(fadeFrom)} stopColor="#0E0B06" stopOpacity={0} />
-            <Stop offset={String(fadeMid)} stopColor="#0E0B06" stopOpacity={0.72} />
-            <Stop offset="1" stopColor="#0E0B06" stopOpacity={0.9} />
+            <Stop offset={String(fadeTo)} stopColor="#0E0B06" stopOpacity={0.78} />
+            <Stop offset="1" stopColor="#0E0B06" stopOpacity={0.84} />
+          </LinearGradient>
+          <LinearGradient id="splash-seam" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor="#0E0B06" stopOpacity={0} />
+            <Stop offset="0.5" stopColor="#0E0B06" stopOpacity={0.6} />
+            <Stop offset="1" stopColor="#0E0B06" stopOpacity={0} />
           </LinearGradient>
           <LinearGradient id="splash-b" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0.75" stopColor="#0E0B06" stopOpacity={0} />
-            <Stop offset="1" stopColor="#0E0B06" stopOpacity={0.6} />
+            <Stop offset="0.8" stopColor="#0E0B06" stopOpacity={0} />
+            <Stop offset="1" stopColor="#0E0B06" stopOpacity={0.55} />
           </LinearGradient>
         </Defs>
         <Rect x={0} y={0} width={L.W} height={L.H} fill="url(#splash-r)" />
+        {/* hides the edge where the sharp photo meets its blurred copy */}
+        <Rect x={imgW - z(90)} y={0} width={z(180)} height={L.H} fill="url(#splash-seam)" />
         <Rect x={0} y={0} width={L.W} height={L.H} fill="url(#splash-b)" />
       </Svg>
 
       {/* brand column */}
-      <View style={{ position: 'absolute', left: st.x(620), top: 0, width: z(330), height: L.H, alignItems: 'center', justifyContent: 'center', gap: z(10) }}>
+      <View style={{ position: 'absolute', left: brandLeft, top: 0, width: brandW, height: L.H, alignItems: 'center', justifyContent: 'center', gap: z(10) }}>
         <Animated.View style={crownStyle}>
           <Crown width={z(58)} />
         </Animated.View>
