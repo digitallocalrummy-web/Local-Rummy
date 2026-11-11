@@ -1,12 +1,10 @@
 import * as Haptics from 'expo-haptics';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { AppState } from 'react-native';
-import { pauseMusic, playSfx, preloadSounds, setMusic, type Sfx } from './sound';
+import { playSfx, preloadSounds, type Sfx } from './sound';
 import { cardBackThemes, tableThemes, type CardBackTheme, type TableTheme } from '../theme';
 
 export interface Settings {
   sound: number;
-  music: number;
   haptics: boolean;
   animations: boolean;
   tableTheme: string;
@@ -28,7 +26,6 @@ const SettingsContext = createContext<SettingsContextValue | null>(null);
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<Settings>({
     sound: 80,
-    music: 45,
     haptics: true,
     animations: true,
     tableTheme: 'emerald',
@@ -40,12 +37,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const sfx = useCallback((kind: Sfx) => playSfx(kind, settings.sound), [settings.sound]);
 
   useEffect(() => { preloadSounds(); }, []);
-  // background music follows the Music slider, and pauses while the app is in the background
-  useEffect(() => {
-    setMusic(settings.music);
-    const sub = AppState.addEventListener('change', (st) => (st === 'active' ? setMusic(settings.music) : pauseMusic()));
-    return () => sub.remove();
-  }, [settings.music]);
 
   const tap = useCallback(
     (style: 'light' | 'medium' | 'success' = 'light') => {

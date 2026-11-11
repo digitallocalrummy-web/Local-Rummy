@@ -1,5 +1,5 @@
 /**
- * Game sounds and background music.
+ * Game sound effects (no background music).
  * The sounds are the same recipes as the web version, rendered to small files in assets/sounds.
  * Players are created once and reused; quick repeats (dealing) use a small pool so they overlap.
  */
@@ -22,7 +22,6 @@ const SOURCES: Record<Sfx, number> = {
 const POOL: Partial<Record<Sfx, number>> = { deal: 4, card: 3, click: 2, chip: 2 };
 
 const pools = new Map<Sfx, { players: AudioPlayer[]; next: number }>();
-let music: AudioPlayer | null = null;
 let ready = false;
 
 function init() {
@@ -63,23 +62,4 @@ export function playSfx(kind: Sfx, volume: number) {
     player.seekTo(0).catch(() => {});
     player.play();
   } catch { /* ignore */ }
-}
-
-/** Background music at `volume` 0–100 (the Music slider); 0 pauses it. */
-export function setMusic(volume: number) {
-  try {
-    if (volume <= 0) { music?.pause(); return; }
-    if (!music) {
-      init();
-      music = createAudioPlayer(require('../../assets/sounds/music.m4a'));
-      music.loop = true;
-    }
-    // the pad is quiet by design: full slider = 35 % so it sits under the game sounds
-    music.volume = (volume / 100) * 0.35;
-    if (!music.playing) music.play();
-  } catch { /* ignore */ }
-}
-
-export function pauseMusic() {
-  try { music?.pause(); } catch { /* ignore */ }
 }

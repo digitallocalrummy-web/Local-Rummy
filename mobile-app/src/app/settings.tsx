@@ -45,11 +45,6 @@ export default function SettingsScreen() {
               <Slider value={st.sound} onChange={(v) => st.update({ sound: v })} label="Sound volume" s={s} />
               <Text style={[label, { width: 34 * s, textAlign: 'right', color: colors.goldBright }]}>{st.sound}</Text>
             </View>
-            <View style={styles.row}>
-              <Text style={[label, { width: 86 * s }]}>Music</Text>
-              <Slider value={st.music} onChange={(v) => st.update({ music: v })} label="Music volume" s={s} />
-              <Text style={[label, { width: 34 * s, textAlign: 'right', color: colors.goldBright }]}>{st.music}</Text>
-            </View>
             <View style={[styles.row, { justifyContent: 'space-between', minHeight: 44 }]}>
               <Text style={label}>Haptic feedback</Text>
               <Toggle value={st.haptics} onChange={(v) => st.update({ haptics: v })} label="Haptic feedback" s={s} />
