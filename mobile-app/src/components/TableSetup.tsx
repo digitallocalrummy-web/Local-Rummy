@@ -1,12 +1,15 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { useSession, type ModeId } from '../net/session';
+import { initialsOf, useSession, type ModeId } from '../net/session';
+import { PlayerAvatar } from './PlayerAvatar';
 import { useSettings } from '../state/settings';
 import { colors, fonts } from '../theme';
 import { AnimatedModal } from './AnimatedModal';
 import { formatChips } from './ChipBalance';
 import { GameButton } from './GameButton';
+
+const AI_SEATS: [string, string][] = [['AR', '#8E2B2B'], ['ME', '#2E5AA8'], ['KB', '#5B2E8C'], ['SN', '#1F6B8C'], ['DV', '#8C6B1F'], ['PR', '#8C1F4A'], ['TJ', '#3F7A2E'], ['AN', '#A0283C'], ['VK', '#2E3F8C']];
 
 export const MODE_LABEL: Record<ModeId, string> = { points: 'POINTS', pool: 'POOL 101', deals: 'DEALS' };
 
@@ -48,10 +51,22 @@ export function TableSetup({ s, mode, free, privateTable, onClose }: { s: number
   return (
     <AnimatedModal visible title={`${privateTable ? 'TABLE WITH FRIENDS' : 'TABLE SETUP'} · ${MODE_LABEL[mode]}`} onClose={onClose} width={560}>
       <View style={{ gap: 12 * s }}>
-        <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 11 * s, letterSpacing: 1.2, color: colors.textMutedBlue }}>PLAYERS AT THE TABLE (INCLUDING YOU)</Text>
+        <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 11 * s, letterSpacing: 1.2, color: colors.textMutedBlue }}>NUMBER OF PLAYERS (INCLUDING YOU)</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 * s }}>
           {Array.from({ length: m.maxPlayers }, (_, i) => i + 1).filter((n) => !privateTable || n >= 2).map((n) => chip(String(n), n === players, () => setPlayers(n), `${n} players`))}
         </View>
+        {!privateTable && (
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 * s }}>
+            {Array.from({ length: players }, (_, i) => {
+              const [initials, color] = i === 0 ? [initialsOf(me?.name ?? 'You'), me?.color ?? '#1F6B4A'] : AI_SEATS[(i - 1) % AI_SEATS.length];
+              return (
+                <View key={i} style={i === 0 ? { borderRadius: 16 * s, borderWidth: 2, borderColor: colors.goldBright } : undefined}>
+                  <PlayerAvatar player={{ name: initials, initials, color }} size={28 * s} />
+                </View>
+              );
+            })}
+          </View>
+        )}
         {players > 1 && !free && (
           <>
             <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 11 * s, letterSpacing: 1.2, color: colors.textMutedBlue }}>ENTRY (VIRTUAL CHIPS)</Text>

@@ -1,42 +1,39 @@
 import { router } from 'expo-router';
-import { ChevronLeft, CircleHelp, Info, LifeBuoy } from 'lucide-react-native';
+import { ChevronLeft } from 'lucide-react-native';
+import { panelStyle, TableBackdrop } from '../components/Backdrop';
+import { Pill } from '../components/LobbyPanes';
+import { useStage } from '../game/Stage';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { AnimatedModal } from '../components/AnimatedModal';
 import { HowToPlayContent, Slider, Toggle } from '../components/Controls';
-import { RadialFill } from '../components/Decor';
 import { GameButton } from '../components/GameButton';
 import { SupportModal } from '../components/SupportModal';
 import { APP_VERSION, useSession } from '../net/session';
-import { CardBack, PlayingCard } from '../components/PlayingCard';
-import { makeCard } from '../data/sample';
 import { useLayout } from '../hooks/useLayout';
 import { useSettings } from '../state/settings';
 import { cardBackThemes, colors, fonts, tableThemes } from '../theme';
 
-const previewCard = makeCard('Q', '♥');
-
 export default function SettingsScreen() {
-  const { s, W, H, safeW } = useLayout();
+  const L = useLayout();
+  const { s } = L;
+  const stage = useStage(L);
   const st = useSettings();
   const [rulesOpen, setRulesOpen] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const { me } = useSession();
 
-  const panelW = Math.min(safeW - 24 * s, 820 * s);
-  const panelH = 372 * s;
-
   const label = { fontFamily: fonts.uiBold, fontSize: 13 * s, color: colors.text } as const;
-  const section = { fontFamily: fonts.uiHeavy, fontSize: 10 * s, letterSpacing: 1.6, color: colors.textMutedBlue } as const;
+  const section = { fontFamily: fonts.uiHeavy, fontSize: 9 * s, letterSpacing: 1.6, color: '#B5BFD3' } as const;
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.bgLobbyDeep }}>
-      <RadialFill inner="#26345A" mid="#18213C" outer="#0E1426" cy="40%" id="settings-bg" />
-      <View style={[styles.panel, { position: 'absolute', left: (W - panelW) / 2, top: (H - panelH) / 2, width: panelW, height: panelH, borderRadius: 22 * s, padding: 18 * s, paddingHorizontal: 24 * s, gap: 14 * s }]}>
+    <View style={{ flex: 1, backgroundColor: '#0B0906' }}>
+      <TableBackdrop flat={0.7} />
+      <View style={[panelStyle, { position: 'absolute', left: stage.x(70), top: stage.y(26), width: stage.z(820), height: stage.z(380), borderRadius: 22 * s, padding: 18 * s, paddingHorizontal: 24 * s, gap: 14 * s }]}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 * s }}>
-          <GameButton s={s} round height={40} variant="ghost" accessibilityLabel="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/lobby'))} icon={<ChevronLeft size={20 * s} color={colors.gold} />} />
+          <GameButton s={s} round height={40} variant="outline" accessibilityLabel="Back" onPress={() => (router.canGoBack() ? router.back() : router.replace('/lobby'))} icon={<ChevronLeft size={20 * s} color={colors.gold} />} />
           <Text accessibilityRole="header" style={{ fontFamily: fonts.display, fontSize: 22 * s, letterSpacing: 3, color: '#F2D27E' }}>SETTINGS</Text>
         </View>
 
@@ -81,7 +78,7 @@ export default function SettingsScreen() {
                         accessibilityState={{ selected: on }}
                         accessibilityLabel={`${t.name} table`}
                         hitSlop={4}
-                        style={{ width: 56 * s, height: 44, borderRadius: 22, backgroundColor: t.mid, borderWidth: 2, borderColor: on ? colors.gold : 'transparent' }}
+                        style={{ width: 56 * s, height: Math.max(40 * s, 40), borderRadius: 20 * s, backgroundColor: t.mid, borderWidth: 2, borderColor: on ? colors.gold : 'transparent' }}
                       />
                     );
                   })}
@@ -110,21 +107,11 @@ export default function SettingsScreen() {
                   })}
                 </View>
               </View>
-              <View style={{ alignItems: 'center', justifyContent: 'center', width: 110 * s }} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-                <View style={{ width: 110 * s, height: 96 * s, borderRadius: 14 * s, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: colors.goldDeep }}>
-                  <RadialFill inner={st.table.light} mid={st.table.mid} outer={st.table.dark} id={`preview-${st.table.id}`} />
-                  <View style={{ flexDirection: 'row' }}>
-                    <CardBack width={40 * s} style={{ transform: [{ rotate: '-8deg' }] }} />
-                    <PlayingCard card={previewCard} width={40 * s} style={{ marginLeft: -12 * s, transform: [{ rotate: '8deg' }] }} />
-                  </View>
-                </View>
-                <Text style={[section, { marginTop: 6 * s }]}>PREVIEW</Text>
-              </View>
             </View>
             <View style={{ marginTop: 'auto', flexDirection: 'row', gap: 10 * s }}>
-              <GameButton s={s} variant="ghost" label="How to Play" height={40} style={{ flex: 1, borderRadius: 12 * s }} onPress={() => setRulesOpen(true)} icon={<CircleHelp size={16 * s} color={colors.gold} />} />
-              <GameButton s={s} variant="ghost" label="Help" height={40} style={{ flex: 1, borderRadius: 12 * s }} onPress={() => setHelpOpen(true)} icon={<LifeBuoy size={16 * s} color={colors.gold} />} />
-              <GameButton s={s} variant="dark" label="About" height={40} style={{ flex: 1, borderRadius: 12 * s }} onPress={() => setAboutOpen(true)} icon={<Info size={16 * s} color={colors.text} />} />
+              <Pill z={stage.z} line h={40} fs={14} label="How to Play" onPress={() => { st.tap(); setRulesOpen(true); }} style={{ flex: 1 }} />
+              <Pill z={stage.z} line h={40} fs={14} label="Help" onPress={() => { st.tap(); setHelpOpen(true); }} style={{ flex: 1 }} />
+              <Pill z={stage.z} line h={40} fs={14} label="About" onPress={() => { st.tap(); setAboutOpen(true); }} style={{ flex: 1, borderColor: 'rgba(255,255,255,0.25)', borderBottomColor: 'rgba(255,255,255,0.25)' }} />
             </View>
           </Animated.View>
         </View>
@@ -144,16 +131,6 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  panel: {
-    backgroundColor: 'rgba(14,20,36,0.95)',
-    borderWidth: 1,
-    borderColor: 'rgba(201,162,74,0.35)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 30 },
-    shadowOpacity: 0.55,
-    shadowRadius: 40,
-    elevation: 16,
-  },
   box: { flex: 1, backgroundColor: 'rgba(255,255,255,0.04)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.08)' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
 });

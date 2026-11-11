@@ -29,11 +29,11 @@ export function GameModeCard({ mode, s, index, onPlay }: { mode: GameMode; s: nu
         <View style={{ position: 'absolute', left: 8 * s, top: 0 }}><PlayerAvatar player={mode.seated[0]} size={av} /></View>
         <View style={{ position: 'absolute', right: 8 * s, top: 0 }}><PlayerAvatar player={mode.seated[1]} size={av} /></View>
         <View style={{ position: 'absolute', alignSelf: 'center', bottom: 0 }}><PlayerAvatar player={mode.seated[2]} size={av} /></View>
-        <View style={[styles.seat, { left: 0, top: 62 * s, width: 26 * s, height: 26 * s, borderRadius: 13 * s }]}>
+        <View style={[styles.seat, { left: 0, top: 62 * s, width: 26 * s, height: 26 * s, borderRadius: 13 * s, borderWidth: 3 * s, borderColor: 'rgba(232,198,106,0.25)' }]}>
           <Plus size={15 * s} color={colors.goldInk} strokeWidth={3} />
         </View>
       </View>
-      <Text numberOfLines={1} style={{ fontFamily: fonts.uiMedium, fontSize: 10 * s, color: colors.textMutedBlue }}>{mode.tagline}</Text>
+      {!!mode.tagline && <Text numberOfLines={1} style={{ fontFamily: fonts.uiMedium, fontSize: 10 * s, color: colors.textMutedBlue }}>{mode.tagline}</Text>}
       <View style={styles.row}>
         <Text style={[styles.label, { fontSize: 11 * s }]}>Players</Text>
         <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 11 * s, color: colors.text }}>{mode.players}</Text>
