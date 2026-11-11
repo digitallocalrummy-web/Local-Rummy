@@ -51,11 +51,13 @@ export default function Splash() {
     pulse.value = withDelay(1000, withRepeat(withSequence(withTiming(1, { duration: 900 }), withTiming(0, { duration: 900 })), -1));
   }, [ready, enter, pulse]);
 
+  // plain numbers: animation worklets can't call z()
+  const rise = z(8);
   const heroStyle = useAnimatedStyle(() => ({ opacity: hero.value, transform: [{ scale: 1.06 - hero.value * 0.06 }] }));
   const crownStyle = useAnimatedStyle(() => ({ opacity: Math.min(1, crown.value), transform: [{ scale: 0.4 + crown.value * 0.6 }] }));
   const logoStyle = useAnimatedStyle(() => ({ opacity: logo.value, transform: [{ scaleX: 1.25 - logo.value * 0.25 }] }));
-  const tagStyle = useAnimatedStyle(() => ({ opacity: tag.value, transform: [{ translateY: (1 - tag.value) * z(8) }] }));
-  const enterStyle = useAnimatedStyle(() => ({ opacity: enter.value, transform: [{ translateY: (1 - enter.value) * z(8) }] }));
+  const tagStyle = useAnimatedStyle(() => ({ opacity: tag.value, transform: [{ translateY: (1 - tag.value) * rise }] }));
+  const enterStyle = useAnimatedStyle(() => ({ opacity: enter.value, transform: [{ translateY: (1 - enter.value) * rise }] }));
   const ringStyle = useAnimatedStyle(() => ({ opacity: 0.5 * (1 - pulse.value), transform: [{ scaleX: 1 + pulse.value * 0.14 }, { scaleY: 1 + pulse.value * 0.5 }] }));
 
   const heroW = st.x(627);
