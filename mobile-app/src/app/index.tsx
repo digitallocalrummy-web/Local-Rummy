@@ -4,7 +4,7 @@ import { Image, Pressable, Text, View } from 'react-native';
 import Animated, {
   Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withSpring, withTiming,
 } from 'react-native-reanimated';
-import Svg, { Defs, LinearGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { Crown } from '../components/Decor';
 import { useStage } from '../game/Stage';
 import { useLayout } from '../hooks/useLayout';
@@ -60,42 +60,38 @@ export default function Splash() {
   const enterStyle = useAnimatedStyle(() => ({ opacity: enter.value, transform: [{ translateY: (1 - enter.value) * rise }] }));
   const ringStyle = useAnimatedStyle(() => ({ opacity: 0.5 * (1 - pulse.value), transform: [{ scaleX: 1 + pulse.value * 0.14 }, { scaleY: 1 + pulse.value * 0.5 }] }));
 
-  const heroW = st.x(627);
+  // photo is 1236×853; cover the screen width and keep the top (her face) in view
+  const heroH = Math.max(L.H, (L.W * 853) / 1236);
+  const heroTop = -(heroH - L.H) * 0.15;
+  // fade starts a little left of the logo column
+  const fadeFrom = Math.max(0, (st.x(560)) / L.W);
+  const fadeMid = Math.min(0.95, st.x(660) / L.W);
   const play = () => { tap('success'); router.replace('/lobby'); };
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0E0B06', overflow: 'hidden' }}>
-      {/* warm glow behind the logo */}
-      <Svg width="100%" height="100%" style={{ position: 'absolute' }} pointerEvents="none">
-        <Defs>
-          <RadialGradient id="splash-bg" cx="82%" cy="42%" rx="70%" ry="90%">
-            <Stop offset="0" stopColor="#2a2010" />
-            <Stop offset="0.45" stopColor="#15100a" />
-            <Stop offset="0.8" stopColor="#0E0B06" />
-          </RadialGradient>
-          <LinearGradient id="fade-r" x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor="#0E0B06" stopOpacity={0} />
-            <Stop offset="0.55" stopColor="#0E0B06" stopOpacity={0.55} />
-            <Stop offset="1" stopColor="#0E0B06" stopOpacity={1} />
-          </LinearGradient>
-          <LinearGradient id="fade-b" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#0E0B06" stopOpacity={0} />
-            <Stop offset="1" stopColor="#0E0B06" stopOpacity={0.7} />
-          </LinearGradient>
-        </Defs>
-        <Rect width="100%" height="100%" fill="url(#splash-bg)" />
-      </Svg>
-
-      {/* hostess photo, fading into the dark on the right and bottom */}
-      <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, top: 0, width: heroW, height: L.H }, heroStyle]}>
+      {/* hostess photo across the full screen, anchored near the top so her face stays in view */}
+      <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, top: heroTop, width: L.W, height: heroH }, heroStyle]}>
         <Image source={HOSTESS} resizeMode="cover" style={{ width: '100%', height: '100%' }}
           accessibilityLabel="Local Rummy hostess beside an emerald card table under a gold chandelier" />
       </Animated.View>
-      <Svg pointerEvents="none" style={{ position: 'absolute', left: heroW - z(160), top: 0 }} width={z(162)} height={L.H}>
-        <Rect width="100%" height="100%" fill="url(#fade-r)" />
-      </Svg>
-      <Svg pointerEvents="none" style={{ position: 'absolute', left: 0, top: L.H - z(80) }} width={heroW + z(13)} height={z(80)}>
-        <Rect width="100%" height="100%" fill="url(#fade-b)" />
+
+      {/* darken the right side behind the logo, and the bottom edge (gradients live in the same Svg: Android needs that) */}
+      <Svg pointerEvents="none" width={L.W} height={L.H} style={{ position: 'absolute', left: 0, top: 0 }}>
+        <Defs>
+          <LinearGradient id="splash-r" x1="0" y1="0" x2="1" y2="0">
+            <Stop offset="0" stopColor="#0E0B06" stopOpacity={0} />
+            <Stop offset={String(fadeFrom)} stopColor="#0E0B06" stopOpacity={0} />
+            <Stop offset={String(fadeMid)} stopColor="#0E0B06" stopOpacity={0.72} />
+            <Stop offset="1" stopColor="#0E0B06" stopOpacity={0.9} />
+          </LinearGradient>
+          <LinearGradient id="splash-b" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0.75" stopColor="#0E0B06" stopOpacity={0} />
+            <Stop offset="1" stopColor="#0E0B06" stopOpacity={0.6} />
+          </LinearGradient>
+        </Defs>
+        <Rect x={0} y={0} width={L.W} height={L.H} fill="url(#splash-r)" />
+        <Rect x={0} y={0} width={L.W} height={L.H} fill="url(#splash-b)" />
       </Svg>
 
       {/* brand column */}

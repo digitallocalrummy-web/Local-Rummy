@@ -1,5 +1,5 @@
 import { StyleSheet, View } from 'react-native';
-import Svg, { Circle, Defs, Path, Pattern, RadialGradient, Rect, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { colors } from '../theme';
 
 /** The Local Rummy crown mark. */
@@ -32,21 +32,36 @@ export function Star({ size = 26 }: { size?: number }) {
   );
 }
 
-/** Faint repeating suit pattern behind the table. */
-export function SuitPattern({ color = colors.bgPattern, background = colors.bgTable }: { color?: string; background?: string }) {
+const SUIT_PATHS = {
+  diamond: 'M8 0 L14 8 L8 16 L2 8 Z',
+  heart: 'M8 15 C8 15 1 10 1 5.5 C1 3 3 1 5 1 C6.5 1 7.5 2 8 3 C8.5 2 9.5 1 11 1 C13 1 15 3 15 5.5 C15 10 8 15 8 15 Z',
+  spade: 'M8 1 C8 1 1 6 1 10 C1 12.2 2.8 13.5 4.6 13.5 C6 13.5 7 12.8 7.4 12 L6.5 15.5 H9.5 L8.6 12 C9 12.8 10 13.5 11.4 13.5 C13.2 13.5 15 12.2 15 10 C15 6 8 1 8 1 Z',
+  club: 'M8 1.2 A3.3 3.3 0 1 1 7.99 1.2 Z M4.2 6.4 A3.3 3.3 0 1 1 4.19 6.4 Z M11.8 6.4 A3.3 3.3 0 1 1 11.79 6.4 Z M7.2 9 L6.2 15.5 H9.8 L8.8 9 Z',
+};
+
+/**
+ * Faint repeating suit pattern behind the table, dark green on dark green like the web version.
+ * Drawn as shapes, not text: Android shows the ♦ ♥ characters as bright emoji.
+ */
+export function SuitPattern({ color = '#0d2a1a', color2 = '#0b2517', background = colors.bgTable }: { color?: string; color2?: string; background?: string }) {
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       <Svg width="100%" height="100%">
         <Defs>
           <Pattern id="suits" width={56} height={56} patternUnits="userSpaceOnUse">
-            <SvgText x={6} y={22} fontSize={16} fill={color}>♦</SvgText>
-            <SvgText x={34} y={50} fontSize={16} fill={color}>♣</SvgText>
-            <SvgText x={34} y={22} fontSize={14} fill={color}>♠</SvgText>
-            <SvgText x={6} y={50} fontSize={14} fill={color}>♥</SvgText>
+            <G transform="translate(6 8)"><Path d={SUIT_PATHS.diamond} fill={color} /></G>
+            <G transform="translate(34 36)"><Path d={SUIT_PATHS.club} fill={color} /></G>
+            <G transform="translate(35 9) scale(0.875)"><Path d={SUIT_PATHS.spade} fill={color2} /></G>
+            <G transform="translate(7 37) scale(0.875)"><Path d={SUIT_PATHS.heart} fill={color2} /></G>
           </Pattern>
+          <RadialGradient id="suits-vignette" cx="50%" cy="50%" rx="60%" ry="70%">
+            <Stop offset="0" stopColor="#000" stopOpacity={0} />
+            <Stop offset="1" stopColor="#000" stopOpacity={0.55} />
+          </RadialGradient>
         </Defs>
         <Rect width="100%" height="100%" fill={background} />
         <Rect width="100%" height="100%" fill="url(#suits)" />
+        <Rect width="100%" height="100%" fill="url(#suits-vignette)" />
       </Svg>
     </View>
   );
