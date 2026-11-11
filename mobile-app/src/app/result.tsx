@@ -47,7 +47,7 @@ export default function Result() {
   const L = useLayout();
   const { s, W, H } = L;
   const st = useStage(L);
-  const { animations: anim, tap } = useSettings();
+  const { animations: anim, tap, sfx } = useSettings();
   const { lastResult, me, seat } = useSession();
   const result = lastResult?.result;
   const t = lastResult?.table;
@@ -72,9 +72,13 @@ export default function Result() {
   const shine = useSharedValue(0.4);
 
   useEffect(() => {
+    // fanfare when you win, a soft falling phrase otherwise (nothing for a cancelled deal)
+    if (result && result.reason !== 'cancelled') sfx(won ? 'win' : 'lose');
     tap('success');
     crown.value = withSpring(1, { damping: 9, stiffness: 140 });
     shine.value = withRepeat(withSequence(withTiming(1, { duration: 1100 }), withTiming(0.4, { duration: 1100 })), -1);
+    // once, when the result screen opens
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [crown, shine, tap]);
 
   const crownStyle = useAnimatedStyle(() => ({

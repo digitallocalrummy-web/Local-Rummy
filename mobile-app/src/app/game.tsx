@@ -60,7 +60,7 @@ function seatStatus(seat: SeatView, active: boolean) {
 export default function GameScreen() {
   const screen = useLayout();
   const st = useStage(screen);
-  const { animations, tap } = useSettings();
+  const { animations, tap, sfx } = useSettings();
   const { table, me, config, connected, draw, discard, declare, drop, leave, chat, onEvent } = useSession();
   const z = st.z;
   const cardW = z(66);
@@ -169,7 +169,15 @@ export default function GameScreen() {
       dealRef.current = d;
       orderRef.current = []; setOrder([]); setSelected([]); setGrouped(false);
       setDeal(d); setNow(d.at);
+      // riffle, then one flick per card as it flies out (same timing as the animation)
+      sfx('shuffle');
+      if (animations) {
+        const tlx = dealTimeline(d.size);
+        for (let n = 0; n < tlx.total; n += 1) later(RIFFLE_MS + n * tlx.gap, () => sfx('deal'));
+      }
     }
+    if (e.type === 'drew' && e.seat !== you) sfx('card');
+    if (e.type === 'discarded') sfx('card');
     if (e.type === 'drew' && e.seat !== you && animations) {
       const to = seatRef.current(e.seat);
       const from = e.from === 'open' ? openTL : deckTL;
@@ -184,7 +192,7 @@ export default function GameScreen() {
     if (e.type === 'declared' && e.seat !== you) flash(e.valid ? `${name(e.seat)} declared!` : `${name(e.seat)} made a wrong show`);
     if (e.type === 'timeout' && e.seat === you) flash('Time’s up · a card was played for you');
     if (e.type === 'ended') { tap('success'); later(1400, () => router.replace('/result')); }
-  }), [onEvent, flash, later, tap, table?.seats, table?.you, animations, deckTL, openTL, cardW, st]);
+  }), [onEvent, flash, later, tap, sfx, table?.seats, table?.you, animations, deckTL, openTL, cardW, st]);
 
   // remove finished flights
   useEffect(() => {
@@ -230,6 +238,20 @@ export default function GameScreen() {
   const canPickDiscard = !!table?.canDiscard && !discardingId && !busy;
   const canDiscard = canPickDiscard && selected.length === 1;
 
+  // chime when your turn starts, and a soft tick for the last 5 seconds
+  const turnKey = myTurn && !dealing ? table?.deadline ?? 0 : null;
+  useEffect(() => {
+    if (turnKey == null) return;
+    sfx('turn');
+    if (!turnKey) return;
+    let last = -1;
+    const id = setInterval(() => {
+      const left = Math.ceil((turnKey - Date.now()) / 1000);
+      if (left <= 5 && left > 0 && left !== last) { last = left; sfx('tick'); }
+    }, 200);
+    return () => clearInterval(id);
+  }, [turnKey, sfx]);
+
   const toggleSelect = useCallback((id: string) => {
     tap('light');
     setSelected((sel) => (sel.includes(id) ? sel.filter((x) => x !== id) : [...sel, id]));
@@ -258,7 +280,8 @@ export default function GameScreen() {
     const r = await draw(from);
     setBusy(false);
     if (!r.ok) flash(r.error ?? 'Could not draw');
-  }, [canDraw, draw, flash, tap]);
+    else sfx('card');
+  }, [canDraw, draw, flash, tap, sfx]);
 
   const onDiscarded = useCallback(async (id: string) => {
     const r = await discard(id);
