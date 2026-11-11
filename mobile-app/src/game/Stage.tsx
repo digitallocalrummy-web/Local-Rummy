@@ -167,7 +167,8 @@ export function Deck({ st, joker, showJoker, showDeck, can, onDraw }: {
   const red = joker && (joker.suit === '♥' || joker.suit === '♦');
   const jx = useSharedValue(0);
   useEffect(() => { jx.value = withTiming(showJoker ? 1 : 0, { duration: 500, easing: Easing.out(Easing.cubic) }); }, [showJoker, jx]);
-  const jStyle = useAnimatedStyle(() => ({ opacity: jx.value, transform: [{ translateX: interpolate(jx.value, [0, 1], [-z(20), 0]) }] }));
+  const jFrom = -z(20); // plain number: worklets can't call JS functions
+  const jStyle = useAnimatedStyle(() => ({ opacity: jx.value, transform: [{ translateX: interpolate(jx.value, [0, 1], [jFrom, 0]) }] }));
   return (
     <At st={st} x={352} y={162} w={62} h={88}>
       {joker ? (
@@ -328,8 +329,9 @@ function RiffleCard({ st, i, ms }: { st: Stage; i: number; ms: number }) {
     p.value = withDelay((i % 5) * 8, withSequence(go, go, go));
   }, [i, one, p]);
   const dir = i % 2 ? 1 : -1;
+  const dx = dir * st.z(44), dy = st.z(10); // plain numbers: worklets can't call JS functions
   const style = useAnimatedStyle(() => ({
-    transform: [{ translateX: dir * st.z(44) * p.value }, { translateY: -st.z(10) * p.value }, { rotate: `${dir * 10 * p.value}deg` }],
+    transform: [{ translateX: dx * p.value }, { translateY: -dy * p.value }, { rotate: `${dir * 10 * p.value}deg` }],
   }));
   return (
     <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: st.x(352), top: st.y(162) - i * 0.6 * st.k, zIndex: 60 + i }, style]}>
