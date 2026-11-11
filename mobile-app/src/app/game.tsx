@@ -122,31 +122,43 @@ export default function GameScreen() {
 
   // ---------- hand ----------
   const serverHand = table?.hand;
+  const orderRef = useRef<string[]>([]);
+  useEffect(() => { orderRef.current = order; }, [order]);
+  const posRef = useRef({ deckTL, openTL });
+  useEffect(() => { posRef.current = { deckTL, openTL }; }, [deckTL, openTL]);
+  const youRef = useRef(table?.you ?? 0);
+  useEffect(() => { youRef.current = table?.you ?? 0; }, [table?.you]);
   useEffect(() => {
     if (!serverHand) return;
-    setOrder((prev) => {
-      const ids = new Set(serverHand.map((c) => c.id));
-      const kept = prev.filter((id) => ids.has(id));
-      const added = serverHand.filter((c) => !kept.includes(c.id));
-      if (!prev.length && added.length >= 13) {
-        // first deal: each card flies from the deck in its dealing round, then the hand is sorted
-        const sorted = sortCards(added).map((c) => c.id);
-        const d = dealRef.current;
-        const fresh = d && Date.now() - d.at < 4000;
-        const pos = fresh ? Math.max(0, d.order.indexOf(table?.you ?? 0)) : 0;
-        const gap = fresh ? dealGap(13 * d.size) : 0;
-        const base = fresh ? RIFFLE_MS - (Date.now() - d.at) : 0;
-        setEntering(Object.fromEntries(sorted.map((id, i) => [id, { from: deckTL, delay: Math.max(0, fresh ? base + (i * d.size + pos) * gap : 120 + i * 40) }])));
-        return sorted;
-      }
+    const prev = orderRef.current;
+    const ids = new Set(serverHand.map((c) => c.id));
+    const kept = prev.filter((id) => ids.has(id));
+    const added = serverHand.filter((c) => !kept.includes(c.id));
+    if (!added.length && kept.length === prev.length) return; // nothing changed
+    const { deckTL: deck, openTL: open } = posRef.current;
+    let next: string[];
+    if (!kept.length && added.length >= 13) {
+      // first deal: each card flies from the deck in its dealing round, then the hand is sorted
+      next = sortCards(added).map((c) => c.id);
+      const d = dealRef.current;
+      const t = Date.now();
+      const fresh = !!d && t - d.at < 4000;
+      const pos = d && fresh ? Math.max(0, d.order.indexOf(youRef.current)) : 0;
+      const gap = d && fresh ? dealGap(13 * d.size) : 0;
+      const base = d && fresh ? RIFFLE_MS - (t - d.at) : 0;
+      const size = d?.size ?? 1;
+      setEntering(Object.fromEntries(next.map((id, i) => [id, { from: deck, delay: Math.max(0, fresh ? base + (i * size + pos) * gap : 120 + i * 40) }])));
+    } else {
+      next = [...kept, ...added.map((c) => c.id)];
       if (added.length) {
-        const from = lastFrom.current === 'open' ? openTL : deckTL;
+        const from = lastFrom.current === 'open' ? open : deck;
         setEntering((e) => ({ ...e, ...Object.fromEntries(added.map((c) => [c.id, { from, delay: 0 }])) }));
         setSelected(added.map((c) => c.id));
       }
-      return [...kept, ...added.map((c) => c.id)];
-    });
-  }, [serverHand, deckTL, openTL, table?.you]);
+    }
+    orderRef.current = next;
+    setOrder(next);
+  }, [serverHand, deal?.at]);
 
   // ---------- table events: deal animation, opponents' draws and throws, chat ----------
   useEffect(() => onEvent((e: TableEvent) => {
@@ -155,7 +167,7 @@ export default function GameScreen() {
     if (e.type === 'dealt') {
       const d = { at: Date.now(), order: (e as { order?: number[] }).order ?? [], size: ((e as { order?: number[] }).order ?? []).length || 1 };
       dealRef.current = d;
-      setOrder([]); setSelected([]); setGrouped(false);
+      orderRef.current = []; setOrder([]); setSelected([]); setGrouped(false);
       setDeal(d); setNow(d.at);
     }
     if (e.type === 'drew' && e.seat !== you && animations) {
@@ -177,7 +189,7 @@ export default function GameScreen() {
   // remove finished flights
   useEffect(() => {
     if (!flights.length) return;
-    const t = setTimeout(() => setFlights((f) => f.slice(-2)), 700);
+    const t = setTimeout(() => setFlights([]), 700); // every flight is over by then
     return () => clearTimeout(t);
   }, [flights]);
 

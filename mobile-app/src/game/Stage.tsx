@@ -3,7 +3,7 @@
  * All positions below are in stage units and converted with `k` (scale) and `ox/oy` (offset).
  */
 import { ArrowDownUp, Layers, LogOut, Smile } from 'lucide-react-native';
-import { memo, useEffect, type ReactNode } from 'react';
+import { memo, useEffect, type ReactNode, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import Animated, {
   Easing, interpolate, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming,
@@ -26,7 +26,8 @@ export function useStage(L: Layout): Stage {
   const k = L.s;
   const ox = L.insets.left + (L.safeW - STAGE_W * k) / 2;
   const oy = L.insets.top + (L.safeH - STAGE_H * k) / 2;
-  return { k, ox, oy, x: (n) => ox + n * k, y: (n) => oy + n * k, z: (n) => n * k };
+  // stable between renders, so effects and memos that depend on positions don't re-run every frame
+  return useMemo(() => ({ k, ox, oy, x: (n: number) => ox + n * k, y: (n: number) => oy + n * k, z: (n: number) => n * k }), [k, ox, oy]);
 }
 
 /** Absolute box at stage coordinates. */
