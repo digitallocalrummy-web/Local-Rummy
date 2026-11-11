@@ -8,6 +8,7 @@ import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import Animated, {
   Easing, interpolate, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming,
 } from 'react-native-reanimated';
+import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { CardBack, PlayingCard } from '../components/PlayingCard';
 import type { Layout } from '../hooks/useLayout';
@@ -66,7 +67,7 @@ export function Felt({ st }: { st: Stage }) {
 
 /** Seat centres for 0–9 opponents, in turn order (clockwise from your left). Same as the web version. */
 const T = (x: number) => ({ x, y: 46 });
-const SL = { x: 80, y: 124 }, TL = { x: 84, y: 46 }, TR = { x: 746, y: 46 }, SR = { x: 770, y: 124 }, SR2 = { x: 770, y: 200 };
+const SL = { x: 86, y: 124 }, TL = { x: 90, y: 46 }, TR = { x: 740, y: 46 }, SR = { x: 752, y: 124 }, SR2 = { x: 752, y: 200 };
 export const SEAT_LAYOUTS: { x: number; y: number }[][] = [
   [], [T(415)], [T(250), T(580)], [SL, T(415), SR], [SL, T(290), T(540), SR],
   [SL, T(220), T(415), T(610), SR], [SL, T(200), T(330), T(460), T(590), SR],
@@ -81,28 +82,65 @@ export const MiniCard = ({ card, w }: { card: Card; w: number }) => (
   </View>
 );
 
+/** Ribbon colours: red while waiting, royal blue on their turn, grey once they're out. */
+const RIBBON = {
+  idle: ['#C53340', '#8E1C27', '#5E0F17'],
+  active: ['#3E6FD0', '#244A9C', '#142E66'],
+  out: ['#6B6F78', '#4A4E56', '#2E3138'],
+} as const;
+
+/**
+ * Opponent profile, game-show style: round avatar in a bronze ring, a ribbon with an arrow tip
+ * carrying the name, and an orange card showing how many cards they hold.
+ * Box: 124 × 54 stage units centred on the seat point.
+ */
 export const OpponentSeat = memo(function OpponentSeat({ st, at, seat, cards, active, status, turnSeconds }: {
   st: Stage; at: { x: number; y: number }; seat: SeatView; cards: number; active: boolean; status: string; turnSeconds?: number;
 }) {
   const z = st.z;
   const out = seat.status !== 'playing';
+  const tone = out ? RIBBON.out : active ? RIBBON.active : RIBBON.idle;
+  const W = 124, H = 54, AV = 46, RW = 96, RH = 28;
+  const rw = z(RW), rh = z(RH), tip = z(10);
+  const id = `rb-${seat.idx}`;
   return (
-    <At st={st} x={at.x - 48} y={at.y - 35} w={96} h={70}
-      style={{
-        borderRadius: z(12), borderWidth: Math.max(1.5, z(2)), borderColor: active ? '#F5C542' : GOLD3, backgroundColor: 'rgba(6,40,24,0.93)',
-        alignItems: 'center', justifyContent: 'center', gap: z(1), opacity: out ? 0.6 : 1, zIndex: 3,
-        shadowColor: active ? '#F5C542' : '#000', shadowOpacity: active ? 0.8 : 0.35, shadowRadius: active ? 14 : 7, shadowOffset: { width: 0, height: active ? 0 : 4 }, elevation: active ? 10 : 4,
-      }}>
-      <View accessible accessibilityLabel={`${seat.name}, ${cards} cards, ${status}`} style={{ flexDirection: 'row', alignItems: 'center', gap: z(7) }}>
-        <View style={{ width: z(40), height: z(40), alignItems: 'center', justifyContent: 'center' }}>
-          <PlayerAvatar player={{ name: seat.name, initials: seat.code, color: seat.color }} size={z(30)} badge={cards} turnSeconds={turnSeconds} />
+    <At st={st} x={at.x - W / 2} y={at.y - H / 2} w={W} h={H} style={{ zIndex: 3, opacity: out ? 0.7 : 1 }}>
+      <View accessible accessibilityLabel={`${seat.name}, ${cards} cards, ${status}`} style={{ flex: 1 }}>
+        {/* ribbon */}
+        <View style={{ position: 'absolute', left: z(W - RW - 2), top: z((H - RH) / 2 + 2), width: rw, height: rh }}>
+          <Svg width={rw} height={rh}>
+            <Defs>
+              <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={tone[0]} />
+                <Stop offset="0.55" stopColor={tone[1]} />
+                <Stop offset="1" stopColor={tone[2]} />
+              </LinearGradient>
+            </Defs>
+            <Path d={`M0 0 H${rw - tip} L${rw} ${rh / 2} L${rw - tip} ${rh} H0 Z`} fill={`url(#${id})`} stroke="rgba(0,0,0,0.55)" strokeWidth={1} />
+            {/* inner trim and top sheen */}
+            <Path d={`M0 ${z(3)} H${rw - tip - z(1.5)} L${rw - z(3.5)} ${rh / 2} L${rw - tip - z(1.5)} ${rh - z(3)} H0`} fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth={1} />
+            <Rect x={0} y={z(2)} width={rw - tip} height={rh * 0.32} fill="#fff" opacity={0.1} />
+          </Svg>
+          <Text numberOfLines={1} style={{ position: 'absolute', left: z(26), right: z(22), top: 0, bottom: 0, textAlignVertical: 'center', lineHeight: rh, textAlign: 'center', fontFamily: fonts.uiHeavy, fontSize: z(11.5), color: '#FFF6E6', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 }}>
+            {seat.name}
+          </Text>
         </View>
-        <View style={{ width: z(22), height: z(31), alignItems: 'center', justifyContent: 'center' }}>
-          {seat.lastThrown ? <MiniCard card={seat.lastThrown} w={z(22)} /> : <CardBack width={z(20)} showMark={false} />}
+
+        {/* status under the ribbon */}
+        <Text numberOfLines={1} style={{ position: 'absolute', left: z(W - RW + 20), right: z(14), top: z((H + RH) / 2 + 3), textAlign: 'center', fontFamily: fonts.uiHeavy, fontSize: z(7.5), letterSpacing: z(1), color: active ? '#F5C542' : MUTE }}>{status}</Text>
+
+        {/* card count: orange card with a white rim */}
+        <View style={{ position: 'absolute', right: z(14), top: z(H / 2 - RH / 2 - 14), width: z(19), height: z(26), borderRadius: z(3), borderWidth: Math.max(1.5, z(1.6)), borderColor: '#FFF8EA', backgroundColor: '#F09A1A', alignItems: 'center', justifyContent: 'center', elevation: 4, shadowColor: '#000', shadowOpacity: 0.4, shadowRadius: 3, shadowOffset: { width: 0, height: 2 } }}>
+          <View style={{ position: 'absolute', left: z(2), right: z(2), top: z(2), bottom: z(2), borderRadius: z(2), borderWidth: 1, borderColor: 'rgba(255,230,160,0.7)' }} />
+          <Text style={{ fontFamily: fonts.uiHeavy, fontSize: z(13), lineHeight: z(15), color: '#fff', textShadowColor: '#7A3E00', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 }}>{cards}</Text>
+        </View>
+
+        {/* avatar in a bronze ring */}
+        <View style={{ position: 'absolute', left: 0, top: z((H - AV) / 2), width: z(AV), height: z(AV), borderRadius: z(AV / 2), alignItems: 'center', justifyContent: 'center', backgroundColor: '#5A2E10', borderWidth: Math.max(2, z(2.5)), borderColor: active ? '#F5C542' : '#C98A3E', shadowColor: active ? '#F5C542' : '#000', shadowOpacity: active ? 0.9 : 0.45, shadowRadius: active ? 10 : 4, shadowOffset: { width: 0, height: active ? 0 : 2 }, elevation: active ? 10 : 5 }}>
+          <View style={{ position: 'absolute', left: z(1.5), right: z(1.5), top: z(1.5), bottom: z(1.5), borderRadius: z(AV), borderWidth: 1, borderColor: '#3A1C08' }} />
+          <PlayerAvatar player={{ name: seat.name, initials: seat.code, color: seat.color }} size={z(AV - 12)} turnSeconds={turnSeconds} />
         </View>
       </View>
-      <Text numberOfLines={1} style={{ fontFamily: fonts.uiHeavy, fontSize: z(11), lineHeight: z(13), color: '#F4EEDC', maxWidth: z(90) }}>{seat.name}</Text>
-      <Text numberOfLines={1} style={{ fontFamily: fonts.uiHeavy, fontSize: z(8), lineHeight: z(10), letterSpacing: z(1), color: active ? '#F5C542' : MUTE, maxWidth: z(90) }}>{status}</Text>
     </At>
   );
 });
@@ -218,15 +256,39 @@ export function OpenPile({ st, card, wild, can, onDraw }: { st: Stage; card: Car
 
 export function Me({ st, name, initials, color, chips, turnSeconds }: { st: Stage; name: string; initials: string; color: string; chips: string; turnSeconds?: number }) {
   const z = st.z;
+  const active = !!turnSeconds;
+  const tone = active ? RIBBON.active : RIBBON.idle;
+  const AV = 54, RW = 112, RH = 24;
+  const rw = z(RW), rh = z(RH), tip = z(9);
   return (
-    <At st={st} x={30} y={318} w={92} style={{ alignItems: 'center', gap: z(4) }}>
-      <View style={{ width: z(52), height: z(52), alignItems: 'center', justifyContent: 'center' }}>
-        <PlayerAvatar player={{ name, initials, color }} size={z(42)} turnSeconds={turnSeconds} />
-      </View>
-      <Text numberOfLines={1} style={{ fontFamily: fonts.uiHeavy, fontSize: z(12), color: '#F4EEDC', maxWidth: z(118) }}>{name} (You)</Text>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: z(4), paddingHorizontal: z(8), paddingVertical: z(2), borderRadius: z(10), backgroundColor: 'rgba(0,0,0,0.4)' }}>
-        <View style={{ width: z(9), height: z(9), borderRadius: z(5), backgroundColor: colors.gold, borderWidth: 1.5, borderColor: '#8a6a2a' }} />
-        <Text style={{ fontFamily: fonts.uiHeavy, fontSize: z(10), color: colors.goldBright }}>{chips}</Text>
+    <At st={st} x={20} y={312} w={RW} style={{ alignItems: 'center' }}>
+      <View accessible accessibilityLabel={`You, ${name}, ${chips} chips`} style={{ alignItems: 'center' }}>
+        {/* avatar in a bronze ring */}
+        <View style={{ width: z(AV), height: z(AV), borderRadius: z(AV / 2), alignItems: 'center', justifyContent: 'center', backgroundColor: '#5A2E10', borderWidth: Math.max(2, z(2.5)), borderColor: active ? '#F5C542' : '#C98A3E', shadowColor: active ? '#F5C542' : '#000', shadowOpacity: active ? 0.9 : 0.45, shadowRadius: active ? 10 : 4, shadowOffset: { width: 0, height: active ? 0 : 2 }, elevation: active ? 10 : 5, zIndex: 2 }}>
+          <View style={{ position: 'absolute', left: z(1.5), right: z(1.5), top: z(1.5), bottom: z(1.5), borderRadius: z(AV), borderWidth: 1, borderColor: '#3A1C08' }} />
+          <PlayerAvatar player={{ name, initials, color }} size={z(AV - 12)} turnSeconds={turnSeconds} />
+        </View>
+        {/* name ribbon, tucked under the avatar */}
+        <View style={{ width: rw, height: rh, marginTop: -z(6) }}>
+          <Svg width={rw} height={rh}>
+            <Defs>
+              <LinearGradient id="rb-me" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={tone[0]} />
+                <Stop offset="0.55" stopColor={tone[1]} />
+                <Stop offset="1" stopColor={tone[2]} />
+              </LinearGradient>
+            </Defs>
+            <Path d={`M${tip} 0 H${rw - tip} L${rw} ${rh / 2} L${rw - tip} ${rh} H${tip} L0 ${rh / 2} Z`} fill="url(#rb-me)" stroke="rgba(0,0,0,0.55)" strokeWidth={1} />
+            <Rect x={tip} y={z(2)} width={rw - tip * 2} height={rh * 0.32} fill="#fff" opacity={0.1} />
+          </Svg>
+          <Text numberOfLines={1} style={{ position: 'absolute', left: tip, right: tip, top: 0, lineHeight: rh, textAlign: 'center', fontFamily: fonts.uiHeavy, fontSize: z(11), color: '#FFF6E6', textShadowColor: 'rgba(0,0,0,0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 1 }}>
+            {name}
+          </Text>
+        </View>
+        <View style={{ marginTop: z(4), flexDirection: 'row', alignItems: 'center', gap: z(4), paddingHorizontal: z(8), paddingVertical: z(2), borderRadius: z(10), backgroundColor: 'rgba(0,0,0,0.45)' }}>
+          <View style={{ width: z(9), height: z(9), borderRadius: z(5), backgroundColor: colors.gold, borderWidth: 1.5, borderColor: '#8a6a2a' }} />
+          <Text style={{ fontFamily: fonts.uiHeavy, fontSize: z(10), color: colors.goldBright }}>{chips}</Text>
+        </View>
       </View>
     </At>
   );
