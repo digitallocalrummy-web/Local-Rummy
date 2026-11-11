@@ -48,7 +48,7 @@ export default function Players() {
             {rows.map((u) => (
               <li key={u.id}>
                 <button onClick={() => open(u.id)} className={cx('flex w-full cursor-pointer items-center gap-3 rounded-xl border p-3 text-left text-text', u.id === selected ? 'border-gold/45 bg-raised' : 'border-transparent bg-transparent')}>
-                  <Avatar name={u.name} color={u.color} size={38} />
+                  <Avatar name={u.name} color={u.color} emoji={u.avatar} photo={u.photoUrl} size={38} />
                   <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <b className="truncate text-sm">{u.name}</b>
                     <span className="text-xs text-mute">{u.code} · Lv {u.level} · {u.gamesPlayed} games · {ago(u.lastActiveAt)}</span>
@@ -66,7 +66,7 @@ export default function Players() {
           <Table head={['Player', 'Player ID', 'Level', 'Chips', 'Games', 'Win rate', 'Last active', 'Status']} empty={!rows.length && <Empty>{list.isLoading ? 'Loading…' : 'No players match.'}</Empty>}>
             {rows.map((u) => (
               <tr key={u.id} className={cx(u.id === selected && '[&_td]:bg-gold/7')}>
-                <td><button onClick={() => open(u.id)} aria-label={`Open ${u.name}`} className="flex cursor-pointer items-center gap-2.5 border-0 bg-transparent p-0 text-left text-[13px] font-bold text-text hover:text-gold2"><Avatar name={u.name} color={u.color} />{u.name}</button></td>
+                <td><button onClick={() => open(u.id)} aria-label={`Open ${u.name}`} className="flex cursor-pointer items-center gap-2.5 border-0 bg-transparent p-0 text-left text-[13px] font-bold text-text hover:text-gold2"><Avatar name={u.name} color={u.color} emoji={u.avatar} photo={u.photoUrl} />{u.name}</button></td>
                 <td className="text-mute">{u.code}</td><td>{u.level}</td><td className="font-bold text-gold2">{fmt(u.chips)}</td><td>{u.gamesPlayed}</td><td>{u.winRate}%</td><td className="text-mute">{ago(u.lastActiveAt)}</td>
                 <td>{u.status === 'blocked' ? <Pill tone="bad">Blocked</Pill> : u.isNew ? <Pill tone="info">New</Pill> : <Pill tone="ok">Active</Pill>}</td>
               </tr>
@@ -103,7 +103,7 @@ function PlayerPanel({ id }: { id: string }) {
   if (!d) return <Card className="flex-[1_1_320px]"><span className="text-mute">Loading…</span></Card>;
   return (
     <aside aria-label="Player details" className="flex min-w-0 flex-[1_1_320px] flex-col gap-4 rounded-[14px] border border-line bg-panel p-5">
-      <div className="flex items-center gap-3.5"><Avatar name={d.name} color={d.color} size={56} ring /><div className="min-w-0 flex-1"><b className="block text-lg">{d.name}</b><span className="text-xs text-mute">{d.code} · joined {new Date(d.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</span></div></div>
+      <div className="flex items-center gap-3.5"><Avatar name={d.name} color={d.color} emoji={d.avatar} photo={d.photoUrl} size={56} ring /><div className="min-w-0 flex-1"><b className="block text-lg">{d.name}</b><span className="text-xs text-mute">{d.code} · joined {new Date(d.createdAt).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' })}</span></div></div>
       <div className="grid grid-cols-2 gap-2.5">
         {[['Chips', fmt(d.chips), true], ['Level', d.level], ['Games', d.gamesPlayed], ['Win rate', d.winRate + '%']].map(([l, v, g]) => (
           <div key={String(l)} className="rounded-[10px] bg-raised p-3"><Label>{l}</Label><b className={cx('mt-1 block text-xl', g && 'text-gold2')}>{v}</b></div>

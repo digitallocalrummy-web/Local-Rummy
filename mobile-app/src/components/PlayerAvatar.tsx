@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import Animated, { Easing, useAnimatedProps, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 import { colors, fonts } from '../theme';
@@ -8,7 +8,8 @@ import type { Player } from '../types';
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 interface Props {
-  player: Pick<Player, 'initials' | 'color' | 'name'>;
+  /** `photo` is a full image URL; otherwise `avatar` (an emoji); otherwise the initials. */
+  player: Pick<Player, 'initials' | 'color' | 'name'> & { avatar?: string | null; photo?: string | null };
   size: number;
   /** Small gold badge (card count). */
   badge?: number | string;
@@ -61,9 +62,16 @@ export function PlayerAvatar({ player, size, badge, turnSeconds }: Props) {
           borderColor: turnSeconds ? '#FFF1C4' : colors.gold,
           alignItems: 'center',
           justifyContent: 'center',
+          overflow: 'hidden',
         }}
       >
-        <Text style={{ fontFamily: fonts.uiHeavy, fontSize: size * 0.36, color: '#FFF4DA' }}>{player.initials}</Text>
+        {player.photo ? (
+          <Image source={{ uri: player.photo }} style={{ width: size, height: size }} resizeMode="cover" accessibilityIgnoresInvertColors />
+        ) : player.avatar ? (
+          <Text style={{ fontSize: size * 0.56, lineHeight: size * 0.72, textAlign: 'center' }}>{player.avatar}</Text>
+        ) : (
+          <Text style={{ fontFamily: fonts.uiHeavy, fontSize: size * 0.36, color: '#FFF4DA' }}>{player.initials}</Text>
+        )}
       </View>
       {badge !== undefined ? (
         <View

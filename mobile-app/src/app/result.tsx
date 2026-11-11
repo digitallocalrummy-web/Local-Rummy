@@ -20,7 +20,7 @@ import { Crown, RadialFill } from '../components/Decor';
 import { GameButton } from '../components/GameButton';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { MODE_LABEL } from '../components/TableSetup';
-import { initialsOf, useSession } from '../net/session';
+import { initialsOf, useSession, photoUri } from '../net/session';
 import { useLayout } from '../hooks/useLayout';
 import { useSettings } from '../state/settings';
 import { colors, fonts } from '../theme';
@@ -56,7 +56,7 @@ export default function Result() {
   const resultRows = (result?.seats ?? [])
     .slice()
     .sort((a, b) => Number(b.won) - Number(a.won) || a.points - b.points)
-    .map((r) => ({ player: { id: String(r.idx), name: r.name, initials: r.code || initialsOf(r.name), color: r.color, chips: 0 }, points: r.points, chips: r.chips, isYou: r.idx === you }));
+    .map((r) => ({ player: { id: String(r.idx), name: r.name, initials: r.code || initialsOf(r.name), color: r.color, chips: 0, avatar: r.avatar ?? null, photo: photoUri(r.photo) }, points: r.points, chips: r.chips, isYou: r.idx === you }));
   const mine = result?.seats.find((r) => r.idx === you);
   const small = resultRows.length > 5;
   const resultStats = [

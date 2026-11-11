@@ -20,6 +20,7 @@
  *   config    public game settings, sent again whenever an admin publishes
  */
 import { eq, sql } from 'drizzle-orm';
+import { photoPath } from '../routes/player';
 import { randomInt } from 'node:crypto';
 import type { Server, Socket } from 'socket.io';
 import { verifyPlayer } from '../auth';
@@ -128,7 +129,7 @@ async function sitDown(p: typeof schema.players.$inferSelect, t: Table, fresh: b
   if (fresh) tables.set(t.id, t);
   const initials = p.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase() || 'LR';
   playerTable.set(p.id, t.id);
-  t.addHuman({ id: p.id, name: p.name, code: initials, color: p.color }, entry);
+  t.addHuman({ id: p.id, name: p.name, code: initials, color: p.color, avatar: p.avatar, photo: photoPath(p) }, entry);
   if (entry > 0) await pushWallet(p.id);
 }
 

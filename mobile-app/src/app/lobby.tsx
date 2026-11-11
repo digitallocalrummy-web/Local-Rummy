@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { LogOut, Settings, User } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { panelStyle, TableBackdrop } from '../components/Backdrop';
@@ -15,7 +15,7 @@ import { PlayerAvatar } from '../components/PlayerAvatar';
 import { gameModes } from '../data/sample';
 import { FriendsPanel } from '../components/FriendsPanel';
 import { MODE_LABEL, TableSetup } from '../components/TableSetup';
-import { initialsOf, needsUpdate, useSession, type ModeId } from '../net/session';
+import { initialsOf, needsUpdate, photoUri, useSession, type ModeId } from '../net/session';
 import { useLayout } from '../hooks/useLayout';
 import { useSettings } from '../state/settings';
 import { colors, fonts } from '../theme';
@@ -52,7 +52,12 @@ export default function Lobby() {
   const me = {
     id: player?.id ?? 'me', name: player?.name ?? 'Player', initials: initialsOf(player?.name ?? 'Player'),
     color: player?.color ?? '#1F6B4A', chips: player?.chips ?? 0, level: player?.level ?? 1,
+    avatar: player?.avatar ?? null, photo: photoUri(player?.photoUrl),
   };
+  // safety net: a new player who skipped past the splash still sets up their profile first
+  useEffect(() => {
+    if (player && !player.profileDone) router.replace('/profile?first=1');
+  }, [player]);
   const chips = me.chips;
   const t = tabs[tab];
   const practice = t.id === 'practice';
@@ -167,6 +172,9 @@ export default function Lobby() {
           <View style={{ flex: 1, gap: 4 * s }}>
             <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 18 * s, color: colors.textWhite }}>{me.name}</Text>
             <Text style={{ fontFamily: fonts.ui, fontSize: 12 * s, color: colors.textMutedGreen }}>Level {me.level} · Player ID {player?.code}</Text>
+            <View style={{ flexDirection: 'row', marginTop: 4 * s }}>
+              <GameButton s={s} variant="outline" height={34} label="EDIT PROFILE" onPress={() => { setProfileOpen(false); router.push('/profile'); }} />
+            </View>
             <View style={{ flexDirection: 'row', gap: 18 * s, marginTop: 6 * s }}>
               {[[String(player?.gamesPlayed ?? 0), 'Games'], [`${player?.gamesPlayed ? Math.round((player.gamesWon / player.gamesPlayed) * 100) : 0}%`, 'Win rate'], [formatChips(chips), 'Chips']].map(([v, l]) => (
                 <View key={l}>

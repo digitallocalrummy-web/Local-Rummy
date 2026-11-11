@@ -48,11 +48,14 @@ export function Switch({ on, onChange, label, disabled }: { on: boolean; onChang
   );
 }
 
-export function Avatar({ name, color, size = 30, ring }: { name: string; color: string; size?: number; ring?: boolean }) {
+/** Player picture: their photo, else their emoji, else initials on their colour. */
+export function Avatar({ name, color, size = 30, ring, emoji, photo }: { name: string; color: string; size?: number; ring?: boolean; emoji?: string | null; photo?: string | null }) {
   const ini = name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   return (
-    <span className={cx('inline-flex flex-none items-center justify-center rounded-full font-extrabold text-white', ring && 'border-2 border-gold')}
-      style={{ width: size, height: size, background: color, fontSize: Math.round(size * 0.36) }}>{ini}</span>
+    <span className={cx('inline-flex flex-none items-center justify-center overflow-hidden rounded-full font-extrabold text-white', ring && 'border-2 border-gold')}
+      style={{ width: size, height: size, background: color, fontSize: Math.round(size * (emoji && !photo ? 0.55 : 0.36)) }}>
+      {photo ? <img src={(import.meta.env.VITE_API_URL ?? '') + photo} alt="" className="h-full w-full object-cover" /> : emoji ?? ini}
+    </span>
   );
 }
 

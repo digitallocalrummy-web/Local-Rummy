@@ -8,6 +8,7 @@ import Svg, { Defs, G, LinearGradient, RadialGradient, Rect, Stop, Text as SvgTe
 import { Crown } from '../components/Decor';
 import { useStage } from '../game/Stage';
 import { useLayout } from '../hooks/useLayout';
+import { useSession } from '../net/session';
 import { useSettings } from '../state/settings';
 import { colors, fonts } from '../theme';
 
@@ -20,6 +21,7 @@ export default function Splash() {
   const st = useStage(L);
   const { z } = st;
   const { tap } = useSettings();
+  const { me } = useSession();
   const [pct, setPct] = useState(0);
 
   const hero = useSharedValue(0);
@@ -71,7 +73,8 @@ export default function Splash() {
   const fadeFrom = Math.max(0, Math.min(0.9, (brandLeft - z(150)) / L.W));
   const fadeTo = Math.max(fadeFrom + 0.05, Math.min(0.97, (brandLeft + z(40)) / L.W));
   const logoW = z(300);
-  const play = () => { tap('success'); router.replace('/lobby'); };
+  // first time: set up the profile (name, photo or emoji) before the lobby
+  const play = () => { tap('success'); router.replace(me && !me.profileDone ? '/profile?first=1' : '/lobby'); };
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0E0B06', overflow: 'hidden' }}>

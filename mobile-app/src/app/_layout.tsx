@@ -58,6 +58,7 @@ export default function RootLayout() {
             <Stack.Screen name="game" options={{ animation: 'fade', gestureEnabled: false }} />
             <Stack.Screen name="result" options={{ animation: 'fade' }} />
             <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="profile" options={{ animation: 'fade' }} />
           </Stack>
           </SessionProvider>
         </SettingsProvider>

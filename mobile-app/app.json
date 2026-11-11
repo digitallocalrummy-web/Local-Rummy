@@ -38,6 +38,13 @@
         {
           "initialOrientation": "LANDSCAPE"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Local Rummy uses your photos so you can choose a profile picture.",
+          "cameraPermission": "Local Rummy uses the camera so you can take a profile picture."
+        }
       ]
     ],
     "scheme": "localrummy",

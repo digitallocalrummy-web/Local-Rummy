@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { initialsOf, useSession, type ModeId } from '../net/session';
+import { initialsOf, photoUri, useSession, type ModeId } from '../net/session';
 import { PlayerAvatar } from './PlayerAvatar';
 import { useSettings } from '../state/settings';
 import { colors, fonts } from '../theme';
@@ -59,9 +59,10 @@ export function TableSetup({ s, mode, free, privateTable, onClose }: { s: number
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 * s }}>
             {Array.from({ length: players }, (_, i) => {
               const [initials, color] = i === 0 ? [initialsOf(me?.name ?? 'You'), me?.color ?? '#1F6B4A'] : AI_SEATS[(i - 1) % AI_SEATS.length];
+              const mine = i === 0 ? { avatar: me?.avatar ?? null, photo: photoUri(me?.photoUrl) } : {};
               return (
                 <View key={i} style={i === 0 ? { borderRadius: 16 * s, borderWidth: 2, borderColor: colors.goldBright } : undefined}>
-                  <PlayerAvatar player={{ name: initials, initials, color }} size={28 * s} />
+                  <PlayerAvatar player={{ name: initials, initials, color, ...mine }} size={28 * s} />
                 </View>
               );
             })}

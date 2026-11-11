@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { requireAdmin, signAdmin } from '../auth';
 import { configSchema, getConfig, getConfigMeta, saveConfig } from '../config';
 import { db, schema } from '../db';
+import { photoPath } from './player';
 import { cancelTable, kickPlayer, liveTables, messageTable, onlineCount, pushWallet, skipTurn } from '../game/manager';
 import { sendPush } from '../push';
 import { InsufficientChips, moveChips } from '../wallet';
@@ -16,7 +17,7 @@ const dayAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
 const startOfIstDay = (d = new Date()) => new Date(`${istDay(d)}T00:00:00+05:30`);
 
 const playerRow = (p: typeof P.$inferSelect) => ({
-  id: p.id, code: p.code, name: p.name, color: p.color, chips: p.chips, level: p.level, status: p.status,
+  id: p.id, code: p.code, name: p.name, color: p.color, avatar: p.avatar, photoUrl: photoPath(p), chips: p.chips, level: p.level, status: p.status,
   gamesPlayed: p.gamesPlayed, gamesWon: p.gamesWon, winRate: p.gamesPlayed ? Math.round((p.gamesWon / p.gamesPlayed) * 100) : 0,
   phone: p.phone, device: p.device, appVersion: p.appVersion, createdAt: p.createdAt, lastActiveAt: p.lastActiveAt,
   isNew: p.createdAt > dayAgo(7),

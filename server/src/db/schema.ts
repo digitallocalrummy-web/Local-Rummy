@@ -16,6 +16,13 @@ export const players = pgTable('players', {
   code: text('code').notNull().unique(),
   name: text('name').notNull(),
   color: text('color').notNull(),
+  /** Emoji avatar chosen by the player (used when there is no photo). */
+  avatar: text('avatar'),
+  /** Profile photo: small JPEG, base64. Served at /api/avatars/:id. */
+  photo: text('photo'),
+  photoVersion: integer('photo_version').notNull().default(0),
+  /** False until the player has set their name on the first-time profile screen. */
+  profileDone: boolean('profile_done').notNull().default(false),
   deviceId: text('device_id').unique(),
   phone: text('phone'),
   device: text('device'),

@@ -12,7 +12,7 @@ import Svg, { Defs, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { CardBack, PlayingCard } from '../components/PlayingCard';
 import type { Layout } from '../hooks/useLayout';
-import type { SeatView } from '../net/session';
+import { photoUri, type SeatView } from '../net/session';
 import { colors, fonts } from '../theme';
 import type { Card } from '../types';
 
@@ -138,7 +138,7 @@ export const OpponentSeat = memo(function OpponentSeat({ st, at, seat, cards, ac
         {/* avatar in a bronze ring */}
         <View style={{ position: 'absolute', left: 0, top: z((H - AV) / 2), width: z(AV), height: z(AV), borderRadius: z(AV / 2), alignItems: 'center', justifyContent: 'center', backgroundColor: '#5A2E10', borderWidth: Math.max(2, z(2.5)), borderColor: active ? '#F5C542' : '#C98A3E', shadowColor: active ? '#F5C542' : '#000', shadowOpacity: active ? 0.9 : 0.45, shadowRadius: active ? 10 : 4, shadowOffset: { width: 0, height: active ? 0 : 2 }, elevation: active ? 10 : 5 }}>
           <View style={{ position: 'absolute', left: z(1.5), right: z(1.5), top: z(1.5), bottom: z(1.5), borderRadius: z(AV), borderWidth: 1, borderColor: '#3A1C08' }} />
-          <PlayerAvatar player={{ name: seat.name, initials: seat.code, color: seat.color }} size={z(AV - 12)} turnSeconds={turnSeconds} />
+          <PlayerAvatar player={{ name: seat.name, initials: seat.code, color: seat.color, avatar: seat.avatar, photo: photoUri(seat.photo) }} size={z(AV - 12)} turnSeconds={turnSeconds} />
         </View>
       </View>
     </At>
@@ -254,7 +254,7 @@ export function OpenPile({ st, card, wild, can, onDraw }: { st: Stage; card: Car
 
 // ---------------------------------------------------------------- you and the right rail
 
-export function Me({ st, name, initials, color, chips, turnSeconds }: { st: Stage; name: string; initials: string; color: string; chips: string; turnSeconds?: number }) {
+export function Me({ st, name, initials, color, chips, turnSeconds, avatar, photo }: { st: Stage; name: string; initials: string; color: string; chips: string; turnSeconds?: number; avatar?: string | null; photo?: string | null }) {
   const z = st.z;
   const active = !!turnSeconds;
   const tone = active ? RIBBON.active : RIBBON.idle;
@@ -266,7 +266,7 @@ export function Me({ st, name, initials, color, chips, turnSeconds }: { st: Stag
         {/* avatar in a bronze ring */}
         <View style={{ width: z(AV), height: z(AV), borderRadius: z(AV / 2), alignItems: 'center', justifyContent: 'center', backgroundColor: '#5A2E10', borderWidth: Math.max(2, z(2.5)), borderColor: active ? '#F5C542' : '#C98A3E', shadowColor: active ? '#F5C542' : '#000', shadowOpacity: active ? 0.9 : 0.45, shadowRadius: active ? 10 : 4, shadowOffset: { width: 0, height: active ? 0 : 2 }, elevation: active ? 10 : 5, zIndex: 2 }}>
           <View style={{ position: 'absolute', left: z(1.5), right: z(1.5), top: z(1.5), bottom: z(1.5), borderRadius: z(AV), borderWidth: 1, borderColor: '#3A1C08' }} />
-          <PlayerAvatar player={{ name, initials, color }} size={z(AV - 12)} turnSeconds={turnSeconds} />
+          <PlayerAvatar player={{ name, initials, color, avatar, photo }} size={z(AV - 12)} turnSeconds={turnSeconds} />
         </View>
         {/* name ribbon, tucked under the avatar */}
         <View style={{ width: rw, height: rh, marginTop: -z(6) }}>

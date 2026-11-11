@@ -18,6 +18,9 @@ export interface Seat {
   name: string;
   code: string;
   color: string;
+  /** Emoji avatar, or a photo path (/api/avatars/…); null shows initials. */
+  avatar?: string | null;
+  photo?: string | null;
   hand: Card[];
   status: SeatStatus;
   drawn: boolean;
@@ -30,7 +33,7 @@ export interface Seat {
 }
 
 export interface SeatResult {
-  idx: number; name: string; code: string; color: string; kind: Seat['kind']; playerId?: string;
+  idx: number; name: string; code: string; color: string; avatar?: string | null; photo?: string | null; kind: Seat['kind']; playerId?: string;
   points: number; chips: number; won: boolean; status: SeatStatus; melds?: Card[][];
 }
 export interface TableResult { winnerIdx: number | null; reason: string; seats: SeatResult[] }
@@ -103,9 +106,9 @@ export class Table {
 
   seatOf(playerId: string) { return this.seats.find((s) => s.playerId === playerId && s.kind === 'human'); }
 
-  addHuman(p: { id: string; name: string; code: string; color: string }, escrow: number): Seat {
+  addHuman(p: { id: string; name: string; code: string; color: string; avatar?: string | null; photo?: string | null }, escrow: number): Seat {
     if (this.phase !== 'waiting' || this.isFull) throw new Error('Table is not open');
-    const seat: Seat = { idx: this.seats.length, kind: 'human', playerId: p.id, name: p.name, code: p.code, color: p.color, hand: [], status: 'playing', drawn: false, missed: 0, moves: 0, connected: true, escrow };
+    const seat: Seat = { idx: this.seats.length, kind: 'human', playerId: p.id, name: p.name, code: p.code, color: p.color, avatar: p.avatar ?? null, photo: p.photo ?? null, hand: [], status: 'playing', drawn: false, missed: 0, moves: 0, connected: true, escrow };
     this.seats.push(seat);
     this.touch();
     if (this.isFull) this.start();
@@ -356,7 +359,7 @@ export class Table {
         }
       } else melds = arrange(s.hand, this.wildRank).melds.map((m) => m.cards);
       const pay = this.entry && reason !== 'cancelled' ? Math.min(this.entry, Math.round((points * this.entry) / 80)) : 0;
-      return { idx: s.idx, name: s.name, code: s.code, color: s.color, kind: s.kind, playerId: s.playerId, points, chips: -pay, won, status: s.status, melds };
+      return { idx: s.idx, name: s.name, code: s.code, color: s.color, avatar: s.avatar ?? null, photo: s.photo ?? null, kind: s.kind, playerId: s.playerId, points, chips: -pay, won, status: s.status, melds };
     });
     const winnerSeat = seats.find((r) => r.won);
     if (winnerSeat) winnerSeat.chips = seats.reduce((sum, r) => sum + (r.won ? 0 : -r.chips), 0);
@@ -387,7 +390,7 @@ export class Table {
       canDraw: !!me && this.turn === forSeat && me.status === 'playing' && !me.drawn && this.phase === 'playing',
       canDiscard: !!me && this.turn === forSeat && me.drawn && this.phase === 'playing',
       seats: this.seats.map((s) => ({
-        idx: s.idx, name: s.name, code: s.code, color: s.color, isBot: s.kind === 'bot',
+        idx: s.idx, name: s.name, code: s.code, color: s.color, avatar: s.avatar ?? null, photo: s.photo ?? null, isBot: s.kind === 'bot',
         cards: s.hand.length, status: s.status, lastThrown: s.lastThrown ?? null, connected: s.connected,
       })),
       open: this.pile[this.pile.length - 1] ?? null,

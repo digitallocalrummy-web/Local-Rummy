@@ -22,14 +22,24 @@ export interface PublicConfig {
 export interface Me {
   id: string; code: string; name: string; color: string; chips: number; level: number;
   gamesPlayed: number; gamesWon: number; bonus: { available: boolean; day: number; amount: number };
+  /** Emoji avatar; photoUrl (a server path) wins when set. */
+  avatar: string | null; photoUrl: string | null;
+  /** False until the player has finished the first-time profile screen. */
+  profileDone: boolean;
 }
+
+/** Profile changes: a photo is a base64 JPEG (already resized). */
+export interface ProfilePatch { name?: string; avatar?: string; photo?: string; removePhoto?: boolean; profileDone?: boolean }
+
+/** Full URL for a photo path from the server, or null. */
+export const photoUri = (path: string | null | undefined) => (path ? `${API_URL}${path}` : null);
 export interface Banner { id: number; title: string; subtitle: string; color: string; target: string }
 
 export interface SeatView {
-  idx: number; name: string; code: string; color: string; isBot: boolean; cards: number;
+  idx: number; name: string; code: string; color: string; avatar?: string | null; photo?: string | null; isBot: boolean; cards: number;
   status: 'playing' | 'dropped' | 'invalid' | 'left'; lastThrown: Card | null; connected: boolean;
 }
-export interface SeatResult { idx: number; name: string; code: string; color: string; kind: 'human' | 'bot'; points: number; chips: number; won: boolean; status: string; melds?: Card[][] }
+export interface SeatResult { idx: number; name: string; code: string; color: string; avatar?: string | null; photo?: string | null; kind: 'human' | 'bot'; points: number; chips: number; won: boolean; status: string; melds?: Card[][] }
 export interface TableResult { winnerIdx: number | null; reason: string; seats: SeatResult[] }
 export interface TableView {
   id: string; mode: ModeId; size: number; entry: number; phase: 'waiting' | 'playing' | 'ended'; you: number;
@@ -63,6 +73,8 @@ interface SessionValue {
   claimBonus: () => Promise<{ amount: number; chips: number }>;
   refill: () => Promise<{ amount: number; chips: number }>;
   rename: (name: string) => Promise<void>;
+  /** Save name / emoji / photo. Resolves with an error message, or null when saved. */
+  saveProfile: (patch: ProfilePatch) => Promise<string | null>;
   seat: (mode: ModeId, players: number, entry: number) => Promise<Ack>;
   createPrivate: (mode: ModeId, players: number, entry: number) => Promise<Ack>;
   joinPrivate: (code: string) => Promise<Ack>;
@@ -192,6 +204,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return r;
     },
     rename: async (name: string) => { setMe(await call<Me>('/api/me', { method: 'PATCH', body: { name } })); },
+    saveProfile: async (patch) => {
+      try { setMe(await call<Me>('/api/me', { method: 'PATCH', body: patch })); return null; }
+      catch (e) { return (e as Error).message || 'Could not save your profile.'; }
+    },
     seat: async (mode, players, entry) => {
       setTable(null); tableRef.current = null; setLastResult(null);
       return emit('seat', { mode, players, entry });

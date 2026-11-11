@@ -14,7 +14,7 @@ import {
 } from '../game/Stage';
 import { WaitingRoom } from '../game/WaitingRoom';
 import { useLayout } from '../hooks/useLayout';
-import { initialsOf, useSession, type SeatView, type TableEvent } from '../net/session';
+import { initialsOf, useSession, type SeatView, type TableEvent, photoUri } from '../net/session';
 import { useSettings } from '../state/settings';
 import { colors, fonts } from '../theme';
 import type { Card } from '../types';
@@ -374,7 +374,7 @@ export default function GameScreen() {
       <OpenPile st={st} card={showOpen ? table.open?.card ?? null : null} wild={!!table.open && isWild(table.open.card)} can={canDraw && !!table.open} onDraw={() => doDraw('open')} />
       </>)}
 
-      <Me st={st} name={meName} initials={meCode} color={me?.color ?? '#1F6B4A'} chips={formatChips(me?.chips ?? 0)}
+      <Me st={st} name={meName} initials={meCode} color={me?.color ?? '#1F6B4A'} chips={formatChips(me?.chips ?? 0)} avatar={me?.avatar ?? null} photo={photoUri(me?.photoUrl)}
         turnSeconds={myTurn && table.deadline && !dealing ? config?.turnSeconds ?? 30 : undefined} />
       {bubble ? (
         <Animated.View entering={FadeInUp.springify()} exiting={FadeOutUp} pointerEvents="none"

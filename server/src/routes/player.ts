@@ -1,5 +1,5 @@
 /** Routes the mobile app calls. */
-import { and, asc, desc, eq, gte, inArray, isNull } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNull, sql } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { randomInt } from 'node:crypto';
 import { z } from 'zod';
@@ -24,8 +24,15 @@ export function bonusState(p: { lastBonusAt: Date | null; bonusStreak: number },
   return { available, day: nextStreak, amount };
 }
 
+/** Where a player's photo is served; the version busts phone caches after a change. */
+export const photoPath = (p: { id: string; photo: string | null; photoVersion: number }) => (p.photo ? `/api/avatars/${p.id}?v=${p.photoVersion}` : null);
+
+/** A small set of friendly emoji; new players get one at random until they choose. */
+export const AVATAR_EMOJI = ['😀', '😎', '🤠', '🥳', '😺', '🦁', '🐯', '🐼', '🦊', '🐸', '🐵', '🦄', '🐲', '👑', '🎩', '🌟', '🔥', '🍀', '🎯', '🃏'];
+
 const publicPlayer = (p: typeof schema.players.$inferSelect) => ({
   id: p.id, code: p.code, name: p.name, color: p.color, chips: p.chips, level: p.level,
+  avatar: p.avatar, photoUrl: photoPath(p), profileDone: p.profileDone,
   gamesPlayed: p.gamesPlayed, gamesWon: p.gamesWon, status: p.status,
   bonus: bonusState(p),
 });
@@ -60,6 +67,7 @@ export async function playerRoutes(app: FastifyInstance) {
       const code = await newCode();
       [p] = await db.insert(schema.players).values({
         code, deviceId, device, appVersion, name: name ?? `Player ${code.slice(3)}`, color: COLORS[randomInt(0, COLORS.length)],
+        avatar: AVATAR_EMOJI[randomInt(0, AVATAR_EMOJI.length)],
       }).returning();
       const welcome = getConfig().welcome;
       if (welcome > 0) p.chips = await moveChips(p.id, welcome, 'welcome', { note: 'Welcome chips' });
@@ -68,6 +76,16 @@ export async function playerRoutes(app: FastifyInstance) {
     }
     if (p.status === 'blocked') return reply.code(403).send({ error: 'This account is blocked. Contact support.' });
     return { token: signPlayer(p.id), player: publicPlayer(p) };
+  });
+
+  /** Profile photos (public, by player id; cached for a day, the ?v= changes on update). */
+  app.get('/api/avatars/:id', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return reply.code(404).send({ error: 'Not found.' });
+    const p = await db.query.players.findFirst({ where: eq(schema.players.id, id), columns: { photo: true } });
+    if (!p?.photo) return reply.code(404).send({ error: 'Not found.' });
+    reply.header('content-type', 'image/jpeg').header('cache-control', 'public, max-age=86400');
+    return reply.send(Buffer.from(p.photo, 'base64'));
   });
 
   app.register(async (auth) => {
@@ -79,10 +97,25 @@ export async function playerRoutes(app: FastifyInstance) {
       return publicPlayer(p);
     });
 
-    auth.patch('/api/me', async (req, reply) => {
-      const body = z.object({ name: z.string().trim().min(2).max(20).optional(), pushToken: z.string().max(300).optional() }).safeParse(req.body);
-      if (!body.success) return reply.code(400).send({ error: 'Names are 2 to 20 characters.' });
-      const [p] = await db.update(schema.players).set(body.data).where(eq(schema.players.id, req.player!.sub)).returning();
+    auth.patch('/api/me', { bodyLimit: 1_000_000 }, async (req, reply) => {
+      const body = z.object({
+        name: z.string().trim().min(2).max(20).regex(/^[\p{L}\p{N} ._'-]+$/u).optional(),
+        pushToken: z.string().max(300).optional(),
+        avatar: z.string().min(1).max(16).optional(),
+        /** base64 JPEG, already resized on the phone (about 256 × 256) */
+        photo: z.string().max(400_000).regex(/^\/9j\//, 'Photos must be JPEG').optional(),
+        removePhoto: z.boolean().optional(),
+        profileDone: z.boolean().optional(),
+      }).safeParse(req.body);
+      if (!body.success) {
+        const field = body.error.issues[0]?.path[0];
+        return reply.code(400).send({ error: field === 'photo' ? 'That photo could not be used. Try another one.' : field === 'avatar' ? 'Pick an emoji.' : 'Names are 2 to 20 letters or numbers.' });
+      }
+      const { photo, removePhoto, ...rest } = body.data;
+      const set: Partial<typeof schema.players.$inferInsert> = { ...rest };
+      if (photo) { set.photo = photo; set.photoVersion = sql`${schema.players.photoVersion} + 1` as unknown as number; }
+      else if (removePhoto) set.photo = null;
+      const [p] = await db.update(schema.players).set(set).where(eq(schema.players.id, req.player!.sub)).returning();
       return publicPlayer(p);
     });
 

@@ -4,7 +4,7 @@ import { ActivityIndicator, Share, Text, View } from 'react-native';
 import { GameButton } from '../components/GameButton';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { MODE_LABEL } from '../components/TableSetup';
-import { useSession, type TableView } from '../net/session';
+import { photoUri, useSession, type TableView } from '../net/session';
 import { useSettings } from '../state/settings';
 import { colors, fonts } from '../theme';
 
@@ -59,7 +59,7 @@ export function WaitingRoom({ table, rect, s }: { table: TableView; rect: Rect; 
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 * s, marginVertical: 4 * s }}>
         {table.seats.map((p) => (
           <View key={p.idx} style={{ alignItems: 'center', gap: 2 * s, width: 64 * s }}>
-            <PlayerAvatar player={{ name: p.name, initials: p.code, color: p.color }} size={34 * s} />
+            <PlayerAvatar player={{ name: p.name, initials: p.code, color: p.color, avatar: p.avatar, photo: photoUri(p.photo) }} size={34 * s} />
             <Text numberOfLines={1} style={{ fontFamily: fonts.uiBold, fontSize: 10 * s, color: colors.textWhite }}>{p.idx === table.you ? 'You' : p.name}</Text>
             {p.idx === table.host && <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 8 * s, letterSpacing: 1, color: colors.gold }}>HOST</Text>}
           </View>
