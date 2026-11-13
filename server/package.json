@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "start": "NODE_ENV=production node dist/index.js",
-    "build": "tsup src/index.ts src/seed.ts --format esm --platform node --target node22 --out-dir dist --clean --noExternal @local-rummy/rummy",
+    "build": "tsup",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/migrate.ts",
     "db:seed": "tsx src/seed.ts",
