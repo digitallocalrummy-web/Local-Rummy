@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  arrange, bestDiscard, buildShoe, checkDeclaration, classifyGroup, decksFor, handPoints, shuffle,
+  arrange, bestDiscard, buildShoe, checkDeclaration, classifyGroup, decksFor, handPoints, hasPureSequence, shuffle,
   type Card, type Rank, type Suit,
 } from './index';
 
@@ -94,4 +94,13 @@ test('random hands are scored quickly and within limits', () => {
     assert.ok(p >= 0 && p <= 80);
   }
   assert.ok(Date.now() - t0 < 8000, `took ${Date.now() - t0} ms`);
+});
+
+test('hasPureSequence finds natural runs only', () => {
+  const c = (rank: string, suit: string, i = 0) => ({ id: `${rank}${suit}${i}`, rank, suit }) as never;
+  assert.equal(hasPureSequence([c('5', '♠'), c('6', '♠'), c('7', '♠'), c('K', '♥')]), true);
+  assert.equal(hasPureSequence([c('Q', '♦'), c('K', '♦'), c('A', '♦')]), true);
+  assert.equal(hasPureSequence([c('K', '♦'), c('A', '♦'), c('2', '♦')]), false);
+  assert.equal(hasPureSequence([c('5', '♠'), c('JK', '★'), c('7', '♠')]), false);
+  assert.equal(hasPureSequence([c('5', '♠'), c('6', '♥'), c('7', '♠')]), false);
 });

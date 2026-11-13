@@ -4,7 +4,7 @@
  */
 import { randomInt } from 'node:crypto';
 import {
-  arrange, bestDiscard, botWantsOpenCard, buildShoe, checkDeclaration, decksFor, label, shuffle, sortHand,
+  arrange, bestDiscard, botWantsOpenCard, buildShoe, checkDeclaration, decksFor, hasPureSequence, label, shuffle, sortHand,
   type Card, type Rank,
 } from '@local-rummy/rummy';
 import type { GameConfig, ModeId } from '../config';
@@ -26,6 +26,8 @@ export interface Seat {
   hand: Card[];
   status: SeatStatus;
   drawn: boolean;
+  /** Closed-joker tables: this player has had a pure sequence, so they may see the wild joker. */
+  sawJoker?: boolean;
   missed: number;
   moves: number;
   dropPoints?: number;
@@ -42,7 +44,7 @@ export interface TableResult { winnerIdx: number | null; reason: string; seats: 
 
 export type TableEvent =
   | { type: 'dealt'; order: number[]; perSeat: number }
-  | { type: 'wild'; card: Card }
+  | { type: 'wild'; card: Card | null }
   | { type: 'turn'; seat: number; deadline: number | null }
   | { type: 'drew'; seat: number; from: 'deck' | 'open'; card?: Card }
   | { type: 'discarded'; seat: number; card: Card }
@@ -91,6 +93,8 @@ export class Table {
   hostId: string | null = null;
   /** Set for admin code tables (code_tables.id). */
   codeTableId: number | null = null;
+  /** 'closed': the wild joker stays hidden from a player until their hand has a pure sequence. */
+  jokerMode: 'open' | 'closed' = 'open';
   /** Admin code tables with auto-start off: wait for the admin even when every seat is filled. */
   holdStart = false;
   /** Players the admin invited to this code table (and whether they declined). */
@@ -171,7 +175,8 @@ export class Table {
     this.pile.push({ card: first, by: -1 });
     const order = this.seats.map((s) => s.idx);
     this.hooks.onEvent(this, { type: 'dealt', order, perSeat: 13 });
-    this.hooks.onEvent(this, { type: 'wild', card: this.wild });
+    // closed joker: nobody is shown the card now; each player sees it in their own view once unlocked
+    this.hooks.onEvent(this, { type: 'wild', card: this.jokerMode === 'closed' ? null : this.wild });
     this.hooks.onChange(this);
     // give the apps time to play the shuffle and deal animation
     const total = 13 * this.size;
@@ -201,7 +206,7 @@ export class Table {
     this.hooks.onEvent(this, { type: 'turn', seat: idx, deadline: this.deadline });
     this.hooks.onChange(this);
     this.clearTurnTimer();
-    if (s.kind === 'bot') this.later(900 + randomInt(0, 1400), () => this.botPlay(idx));
+    if (s.kind === 'bot') this.later(550 + randomInt(0, 650), () => this.botPlay(idx));
     else if (this.deadline) this.turnTimer = setTimeout(() => this.onTimeout(idx), this.cfg.turnSeconds * 1000 + 300);
   }
 
@@ -210,7 +215,7 @@ export class Table {
     if (this.active.length <= 1 && !this.solo) { this.finish(this.active[0]?.idx ?? null, 'others_dropped'); return; }
     for (let k = 1; k <= this.size; k++) {
       const i = (this.turn + k) % this.size;
-      if (this.seats[i].status === 'playing') { this.later(this.seats[i].kind === 'bot' ? 350 : 150, () => this.beginTurn(i)); return; }
+      if (this.seats[i].status === 'playing') { this.later(this.seats[i].kind === 'bot' ? 200 : 100, () => this.beginTurn(i)); return; }
     }
   }
 
@@ -339,7 +344,7 @@ export class Table {
     const s = this.seats[idx];
     const top = this.pile[this.pile.length - 1]?.card ?? null;
     this.draw(idx, botWantsOpenCard(s.hand, top, this.wildRank) ? 'open' : 'deck');
-    this.later(500 + randomInt(0, 700), () => {
+    this.later(300 + randomInt(0, 400), () => {
       if (this.turn !== idx || this.phase !== 'playing') return;
       const { card } = bestDiscard(s.hand, this.wildRank);
       const rest = s.hand.filter((c) => c.id !== card.id);
@@ -383,8 +388,16 @@ export class Table {
   // ---------- views ----------
 
   /** What one seat (or a spectator, seat = -1) is allowed to see. */
+  /** Closed joker: may this seat see the wild card? Sticky once their hand has had a pure sequence. */
+  seesJoker(s: Seat | undefined) {
+    if (this.jokerMode === 'open' || this.phase === 'ended' || !s || s.kind === 'bot') return true;
+    if (!s.sawJoker && hasPureSequence(s.hand)) s.sawJoker = true;
+    return !!s.sawJoker;
+  }
+
   view(forSeat: number) {
     const me = this.seats[forSeat];
+    const sees = this.seesJoker(me);
     return {
       id: this.id,
       mode: this.mode,
@@ -408,8 +421,11 @@ export class Table {
       open: this.pile[this.pile.length - 1] ?? null,
       recent: this.pile.slice(-4).map((p) => ({ card: p.card, by: p.by })),
       deckCount: this.deck.length,
-      wild: this.wild,
-      wildRank: this.wildRank,
+      // closed joker: hidden until this player has made a pure sequence (and always once the deal ends)
+      wild: sees ? this.wild : null,
+      wildRank: sees ? this.wildRank : null,
+      jokerMode: this.jokerMode,
+      jokerLocked: !sees,
       turn: this.turn,
       deadline: this.deadline,
       result: this.result,

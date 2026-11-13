@@ -76,7 +76,7 @@ export default function CodeTables() {
                     <button onClick={() => pick(x.id)} aria-label={`Open code table ${x.displayCode}`} className="cursor-pointer border-0 bg-transparent p-0 text-left font-mono text-[13px] font-extrabold tracking-wider text-gold2 underline decoration-line2 underline-offset-[3px]">{x.displayCode}</button>
                     {x.title && <span className="block max-w-[180px] truncate text-[11px] text-mute">{x.title}</span>}
                   </td>
-                  <td>{MODE_NAMES[x.mode]}</td>
+                  <td>{MODE_NAMES[x.mode]}<span className="block text-[11px] text-mute">{x.jokerMode === 'closed' ? 'Closed Joker' : 'Open Joker'}</span></td>
                   <td>{x.status === 'open' ? `${x.seated} / ${x.players} joined` : x.players}</td>
                   <td className="font-bold text-gold2">{x.entry ? fmt(x.entry) : 'Free'}</td>
                   <td className="text-mute">{x.allow.length ? `${x.allow.length} invited` : 'Anyone with code'}</td>
@@ -197,7 +197,7 @@ function Detail({ id, canEdit }: { id: number; canEdit: boolean }) {
         <div className="min-w-0 flex-1">
           <Label>Table code</Label>
           <b className="block font-mono text-[30px] leading-tight tracking-[0.14em] text-gold2">{d.displayCode}</b>
-          <span className="block text-xs text-mute">{d.title ? `${d.title} · ` : ''}{MODE_NAMES[d.mode]} · {d.players} players · {d.entry ? `entry ${fmt(d.entry)} chips` : 'free'}</span>
+          <span className="block text-xs text-mute">{d.title ? `${d.title} · ` : ''}{MODE_NAMES[d.mode]} · {d.jokerMode === 'closed' ? 'Closed Joker' : 'Open Joker'} · {d.players} players · {d.entry ? `entry ${fmt(d.entry)} chips` : 'free'}</span>
         </div>
         <StatusPill s={d.status} />
       </div>
@@ -343,6 +343,7 @@ function CreateDialog({ onClose, onCreated, preset }: { onClose: () => void; onC
   const [exp, setExp] = useState(60);
   const [at, setAt] = useState('');
   const [auto, setAuto] = useState(false);
+  const [joker, setJoker] = useState<'open' | 'closed'>('open');
   const [title, setTitle] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
@@ -359,7 +360,7 @@ function CreateDialog({ onClose, onCreated, preset }: { onClose: () => void; onC
     mutationFn: () => api('/api/admin/code-tables', {
       body: {
         title: title.trim() || undefined, mode, players: Math.min(players, m?.maxPlayers ?? players), entry,
-        allow: who === 'list' ? allow : [], autoStart: auto,
+        allow: who === 'list' ? allow : [], autoStart: auto, jokerMode: joker,
         ...(exp === -1 ? { expiresAt: at ? new Date(at).toISOString() : undefined } : { expiresInMinutes: exp }),
       },
     }),
@@ -397,6 +398,17 @@ function CreateDialog({ onClose, onCreated, preset }: { onClose: () => void; onC
             <div className="flex flex-col gap-1.5"><Label>Entry</Label>
               <Chips label="Entry" value={entry} onChange={setEntry} options={[{ value: 0, label: 'Free' }, ...(m?.entries ?? []).map((e: number) => ({ value: e, label: `${fmt(e)} chips` }))]} />
             </div>
+            <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
+              <legend className="mb-1.5 text-[11px] font-extrabold tracking-[1.4px] text-mute uppercase">Joker</legend>
+              <div className="grid grid-cols-2 gap-2">
+                {([['open', 'Open Joker', 'The wild joker card is shown to everyone when the cards are dealt.'], ['closed', 'Closed Joker', 'The wild joker stays hidden. A player sees it only after making a pure sequence.']] as const).map(([v, t, d]) => (
+                  <label key={v} className={cx('flex cursor-pointer flex-col gap-1 rounded-xl border p-3', joker === v ? 'border-gold/60 bg-gold/10' : 'border-line bg-raised hover:border-line2')}>
+                    <span className="flex items-center gap-2 text-sm font-extrabold"><input type="radio" name="joker" checked={joker === v} onChange={() => setJoker(v)} />{t}</span>
+                    <span className="text-xs text-mute">{d}</span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
               <legend className="mb-1.5 text-[11px] font-extrabold tracking-[1.4px] text-mute uppercase">Who can join</legend>
               <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="radio" name="who" checked={who === 'anyone'} onChange={() => setWho('anyone')} /> Anyone with the code</label>

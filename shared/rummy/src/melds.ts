@@ -46,6 +46,26 @@ export function isPureSequence(cards: Card[]): boolean {
   return consecutive(high);
 }
 
+/**
+ * True when some 3 cards of the hand form a pure sequence (natural cards only, ace low or high).
+ * Closed-joker tables show a player the wild joker once this is true.
+ */
+export function hasPureSequence(hand: Card[]): boolean {
+  const bySuit = new Map<string, Set<number>>();
+  for (const c of hand) {
+    if (isPrintedJoker(c)) continue;
+    const set = bySuit.get(c.suit) ?? new Set<number>();
+    const n = rankNumber(c.rank);
+    set.add(n);
+    if (n === 1) set.add(14); // ace high
+    bySuit.set(c.suit, set);
+  }
+  for (const set of bySuit.values()) {
+    for (const n of set) if (set.has(n + 1) && set.has(n + 2)) return true;
+  }
+  return false;
+}
+
 export function isImpureSequence(cards: Card[], wildRank: Rank | null): boolean {
   if (cards.length < 3 || cards.length > 13) return false;
   const naturals = cards.filter((c) => !isWild(c, wildRank));

@@ -198,8 +198,8 @@ function Glow({ on, z, radius }: { on: boolean; z: (n: number) => number; radius
   );
 }
 
-export function Deck({ st, joker, showJoker, showDeck, can, onDraw }: {
-  st: Stage; joker: Card | null; showJoker: boolean; showDeck: boolean; can: boolean; onDraw: () => void;
+export function Deck({ st, joker, closed, showJoker, showDeck, can, onDraw }: {
+  st: Stage; joker: Card | null; closed?: boolean; showJoker: boolean; showDeck: boolean; can: boolean; onDraw: () => void;
 }) {
   const z = st.z;
   const red = joker && (joker.suit === '♥' || joker.suit === '♦');
@@ -214,6 +214,13 @@ export function Deck({ st, joker, showJoker, showDeck, can, onDraw }: {
           <Text style={{ fontFamily: fonts.card, fontSize: z(15), color: joker.rank === 'JK' ? colors.joker : red ? '#C8102E' : '#16181D' }}>{joker.rank === 'JK' ? 'J' : joker.rank}</Text>
           <Text style={{ fontSize: z(15), color: red ? '#C8102E' : '#16181D' }}>{joker.suit}</Text>
         </Animated.View>
+      ) : closed && showJoker ? (
+        // closed joker: the card sits face down under the deck until you make a pure sequence
+        <View accessibilityLabel="Closed joker, hidden until you make a pure sequence"
+          style={{ position: 'absolute', left: z(20), top: z(22), width: z(76), height: z(54), borderRadius: z(6), overflow: 'hidden', borderWidth: 1, borderColor: '#D9D0BA', elevation: 3, alignItems: 'flex-end', justifyContent: 'center', paddingRight: z(6), backgroundColor: '#7A1E2B' }}>
+          <View style={{ position: 'absolute', left: z(3), right: z(3), top: z(3), bottom: z(3), borderRadius: z(4), borderWidth: 1, borderColor: 'rgba(232,198,106,0.6)' }} />
+          <Text style={{ fontSize: z(14) }}>🔒</Text>
+        </View>
       ) : null}
       {showDeck ? (
         <>
@@ -229,7 +236,7 @@ export function Deck({ st, joker, showJoker, showDeck, can, onDraw }: {
         </>
       ) : null}
       <Text style={{ position: 'absolute', top: z(96), left: 0, width: z(200), fontFamily: fonts.uiHeavy, fontSize: z(9), letterSpacing: z(1.4), color: '#CFE3D6' }}>
-        {showJoker && joker ? `DECK · JOKER ${joker.rank === 'JK' ? 'A' : joker.rank}${joker.rank === 'JK' ? '' : joker.suit}` : 'DECK'}
+        {showJoker && joker ? `DECK · JOKER ${joker.rank === 'JK' ? 'A' : joker.rank}${joker.rank === 'JK' ? '' : joker.suit}` : closed && showJoker ? 'DECK · CLOSED JOKER' : 'DECK'}
       </Text>
     </At>
   );
@@ -331,7 +338,9 @@ export function RightRail({ st, modeName, info, pointsLabel, points, canDiscard,
       <IconBtn st={st} x={900} label="Leave table" onPress={onLeave}><LogOut size={z(18)} color={colors.gold} /></IconBtn>
       <At st={st} x={836} y={74} w={110} pointerEvents="none" style={{ paddingHorizontal: z(10), paddingVertical: z(6), borderRadius: z(12), borderWidth: 1.5, borderColor: 'rgba(201,162,74,0.8)', backgroundColor: 'rgba(6,40,24,0.9)', gap: z(2) }}>
         <Text style={{ fontFamily: fonts.uiHeavy, fontSize: z(11), letterSpacing: z(0.6), color: '#fff' }}>{modeName}</Text>
-        <Text numberOfLines={1} style={{ fontFamily: fonts.uiHeavy, fontSize: z(9), letterSpacing: z(0.3), color: colors.goldBright }}>{info}</Text>
+        {info.split('\n').map((line, i) => (
+          <Text key={i} numberOfLines={1} style={{ fontFamily: fonts.uiHeavy, fontSize: z(i ? 8 : 9), letterSpacing: z(0.3), color: i ? '#F5C542' : colors.goldBright }}>{line}</Text>
+        ))}
       </At>
       <At st={st} x={836} y={134} w={110} pointerEvents="none" style={{ alignItems: 'center', paddingHorizontal: z(14), paddingVertical: z(5), borderRadius: z(16), borderWidth: 1.5, borderColor: GOLD3, backgroundColor: 'rgba(6,40,24,0.9)' }}>
         <Text style={{ fontFamily: fonts.uiHeavy, fontSize: z(9), letterSpacing: z(0.8), color: colors.gold }}>{pointsLabel}</Text>

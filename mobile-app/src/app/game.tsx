@@ -1,4 +1,4 @@
-import { arrange, bestDiscard, type Card as RCard, type Rank } from '@local-rummy/rummy';
+
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
@@ -13,6 +13,7 @@ import {
   Banner, Deck, Felt, FlyCard, Me, OpenPile, OpponentSeat, Riffle, RightRail, SEAT_LAYOUTS, Tray, useStage, type Flight,
 } from '../game/Stage';
 import { WaitingRoom } from '../game/WaitingRoom';
+import { groupInfo, pointsLeft, smartGroups, type GroupKind } from '../game/hand';
 import { useLayout } from '../hooks/useLayout';
 import { initialsOf, useSession, type SeatView, type TableEvent, photoUri } from '../net/session';
 import { useSettings } from '../state/settings';
@@ -37,16 +38,28 @@ function dealTimeline(size: number) {
   return { total, gap, lastLand, jokerAt, openAt, openLand: openAt + 300, end: openAt + 1300 };
 }
 
-/** Hand positions in stage units, the same formula as the web version. */
-function handXs(hand: Card[], grouped: boolean) {
-  const n = hand.length, gap = grouped ? 14 : 0;
+/**
+ * Hand positions in stage units (left edge of each card). `groupOf[i]` is the group of card i;
+ * a new group starts a little gap to the right so groups read as separate blocks.
+ */
+function handXs(n: number, groupOf: number[] | null) {
+  const gap = groupOf ? 18 : 0;
   let breaks = 0;
-  for (let i = 1; i < n; i++) if (hand[i].suit !== hand[i - 1].suit) breaks++;
+  if (groupOf) for (let i = 1; i < n; i++) if (groupOf[i] !== groupOf[i - 1]) breaks++;
   const area = 600, step = Math.min(44, (area - 66 - breaks * gap) / Math.max(1, n - 1));
   const total = step * (n - 1) + 66 + breaks * gap;
   let x = 150 + (area - total) / 2;
-  return hand.map((c, i) => { if (i > 0) { x += step; if (grouped && c.suit !== hand[i - 1].suit) x += gap; } return x; });
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) { if (i > 0) { x += step; if (groupOf && groupOf[i] !== groupOf[i - 1]) x += gap; } out.push(x); }
+  return out;
 }
+
+const GROUP_TONE: Record<GroupKind, { bg: string; fg: string }> = {
+  pure: { bg: 'rgba(46,160,90,0.92)', fg: '#fff' },
+  impure: { bg: 'rgba(46,110,200,0.92)', fg: '#fff' },
+  set: { bg: 'rgba(46,110,200,0.92)', fg: '#fff' },
+  invalid: { bg: 'rgba(0,0,0,0.55)', fg: '#F3D58A' },
+};
 
 function seatStatus(seat: SeatView, active: boolean) {
   if (!seat.connected) return 'OFFLINE';
@@ -70,7 +83,8 @@ export default function GameScreen() {
   // the player's own arrangement of their cards; the server only knows which cards they hold
   const [order, setOrder] = useState<string[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
-  const [grouped, setGrouped] = useState(false);
+  // GROUP: the player's card groups (ids); null = one plain row
+  const [groups, setGroups] = useState<string[][] | null>(null);
   const [entering, setEntering] = useState<Record<string, { from: { x: number; y: number }; delay: number }>>({});
   const [discardingId, setDiscardingId] = useState<string | null>(null);
   const [declareOpen, setDeclareOpen] = useState(false);
@@ -167,7 +181,7 @@ export default function GameScreen() {
     if (e.type === 'dealt') {
       const d = { at: Date.now(), order: (e as { order?: number[] }).order ?? [], size: ((e as { order?: number[] }).order ?? []).length || 1 };
       dealRef.current = d;
-      orderRef.current = []; setOrder([]); setSelected([]); setGrouped(false);
+      orderRef.current = []; setOrder([]); setSelected([]); setGroups(null);
       setDeal(d); setNow(d.at);
       // riffle, then one flick per card as it flies out (same timing as the animation)
       sfx('shuffle');
@@ -220,16 +234,41 @@ export default function GameScreen() {
   }, [deal?.at, opps.length]);
 
   const byId = useMemo(() => new Map((table?.hand ?? []).map((c) => [c.id, c])), [table?.hand]);
-  const hand = useMemo(() => order.map((id) => byId.get(id)).filter(Boolean) as Card[], [order, byId]);
-  const xs = useMemo(() => handXs(hand, grouped).map((x) => st.x(x)), [hand, grouped, st]);
+  // groups that still match the hand: thrown cards drop out, new cards form their own group at the end
+  const liveGroups = useMemo(() => {
+    if (!groups) return null;
+    const have = new Set(order.filter((id) => byId.has(id)));
+    const g = groups.map((x) => x.filter((id) => have.has(id))).filter((x) => x.length);
+    const placed = new Set(g.flat());
+    const extra = order.filter((id) => have.has(id) && !placed.has(id));
+    return extra.length ? [...g, extra] : g;
+  }, [groups, order, byId]);
+  const shownOrder = useMemo(() => (liveGroups ? liveGroups.flat() : order), [liveGroups, order]);
+  const hand = useMemo(() => shownOrder.map((id) => byId.get(id)).filter(Boolean) as Card[], [shownOrder, byId]);
+  const groupOf = useMemo(() => (liveGroups ? liveGroups.flatMap((g, gi) => g.map(() => gi)) : null), [liveGroups]);
+  const xs = useMemo(() => handXs(hand.length, groupOf).map((x) => st.x(x)), [hand.length, groupOf, st]);
   const wildRank = table?.wildRank ?? null;
   const isWild = (c: Card) => c.rank === 'JK' || (!!wildRank && c.rank === wildRank);
 
-  const myPoints = useMemo(() => {
-    if (!wildRank || hand.length < 13) return null;
-    const h = hand as unknown as RCard[];
-    return h.length > 13 ? bestDiscard(h, wildRank as Rank).pointsAfter : arrange(h, wildRank as Rank, 8000).points;
-  }, [hand, wildRank]);
+  // points left in your hand, worked out just after the cards settle so taps and animations stay smooth
+  const handKey = hand.map((c) => c.id).sort().join(',');
+  const [myPoints, setMyPoints] = useState<number | null>(null);
+  useEffect(() => {
+    if (hand.length < 13) return;
+    const t = setTimeout(() => setMyPoints(pointsLeft(hand, wildRank)), 60);
+    return () => clearTimeout(t);
+    // hand order doesn't change the points; only which cards you hold
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handKey, wildRank]);
+  const groupLabels = useMemo(() => {
+    if (!liveGroups || !groupOf) return [];
+    let i = 0;
+    return liveGroups.map((g) => {
+      const first = i; i += g.length;
+      const cards = g.map((id) => byId.get(id)).filter(Boolean) as Card[];
+      return { key: g.join('-'), x1: xs[first], x2: xs[i - 1] + cardW, info: groupInfo(cards, wildRank) };
+    });
+  }, [liveGroups, groupOf, xs, byId, wildRank, cardW]);
 
   const myTurn = !!table && table.turn === table.you && table.phase === 'playing';
   const mySeat = table?.seats[table.you];
@@ -237,6 +276,18 @@ export default function GameScreen() {
   const canDraw = !!table?.canDraw && !busy && !dealing;
   const canPickDiscard = !!table?.canDiscard && !discardingId && !busy;
   const canDiscard = canPickDiscard && selected.length === 1;
+
+  // closed joker: tell the player when making a pure sequence reveals the joker
+  const wasLocked = useRef(false);
+  useEffect(() => {
+    if (!table) return;
+    if (table.jokerLocked) { wasLocked.current = true; return; }
+    if (wasLocked.current && table.wild && table.phase === 'playing') {
+      wasLocked.current = false;
+      sfx('chip');
+      flash(`Pure sequence made · the joker is ${table.wild.rank === 'JK' ? 'A' : table.wild.rank}${table.wild.rank === 'JK' ? '' : table.wild.suit}`, 3500);
+    }
+  }, [table, sfx, flash]);
 
   // chime when your turn starts, and a soft tick for the last 5 seconds
   const turnKey = myTurn && !dealing ? table?.deadline ?? 0 : null;
@@ -258,19 +309,31 @@ export default function GameScreen() {
   }, [tap]);
 
   const onDrop = useCallback((id: string, finalX: number) => {
+    let to = 0, best = Infinity;
+    xs.forEach((x, i) => { const d = Math.abs(x - finalX); if (d < best) { best = d; to = i; } });
+    const from = shownOrder.indexOf(id);
+    if (from < 0 || to === from) return;
+    tap('light');
+    if (liveGroups) {
+      // move the card into the group it was dropped on, at that spot
+      const target = shownOrder[to];
+      const next = liveGroups.map((g) => g.filter((x) => x !== id));
+      const gi = next.findIndex((g) => g.includes(target));
+      if (gi >= 0) {
+        const at = next[gi].indexOf(target) + (to > from ? 1 : 0);
+        next[gi].splice(at, 0, id);
+      }
+      setGroups(next.filter((g) => g.length));
+      return;
+    }
     setOrder((o) => {
-      const from = o.indexOf(id);
-      if (from < 0) return o;
-      let to = 0, best = Infinity;
-      xs.forEach((x, i) => { const d = Math.abs(x - finalX); if (d < best) { best = d; to = i; } });
-      if (to === from) return o;
+      const f = o.indexOf(id);
+      if (f < 0) return o;
       const next = [...o];
-      next.splice(to, 0, next.splice(from, 1)[0]);
-      tap('light');
-      setGrouped(false);
+      next.splice(to, 0, next.splice(f, 1)[0]);
       return next;
     });
-  }, [xs, tap]);
+  }, [xs, tap, shownOrder, liveGroups]);
 
   const doDraw = useCallback(async (from: 'deck' | 'open') => {
     if (!canDraw) return;
@@ -346,7 +409,7 @@ export default function GameScreen() {
   const showJoker = !dealing || (!!tl && elapsed >= tl.jokerAt);
   const showOpen = !dealing || (!!tl && elapsed >= tl.openLand);
   const mode = MODE_LABEL[table.mode];
-  const info = `${table.size === 1 ? 'SOLO' : `${table.size} PLAYERS`} · ${table.entry ? formatChips(table.entry) : 'FREE'}`;
+  const info = `${table.size === 1 ? 'SOLO' : `${table.size} PLAYERS`} · ${table.entry ? formatChips(table.entry) : 'FREE'}${table.jokerMode === 'closed' ? '\nCLOSED JOKER' : ''}`;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bgTable }}>
@@ -370,7 +433,7 @@ export default function GameScreen() {
           <Text style={{ fontFamily: fonts.uiBold, fontSize: z(11), color: '#CFE3D6' }}>AI players fill the empty seats soon</Text>
         </View>
       ) : (<>
-      <Deck st={st} joker={table.wild} showJoker={showJoker} showDeck={showDeck} can={canDraw} onDraw={() => doDraw('deck')} />
+      <Deck st={st} joker={table.wild} closed={!!table.jokerLocked && table.phase === 'playing'} showJoker={showJoker} showDeck={showDeck} can={canDraw} onDraw={() => doDraw('deck')} />
       <OpenPile st={st} card={showOpen ? table.open?.card ?? null : null} wild={!!table.open && isWild(table.open.card)} can={canDraw && !!table.open} onDraw={() => doDraw('open')} />
       </>)}
 
@@ -382,6 +445,20 @@ export default function GameScreen() {
           <Text style={{ fontFamily: fonts.uiHeavy, fontSize: z(12), color: colors.goldInk }}>{bubble}</Text>
         </Animated.View>
       ) : null}
+
+      {groupLabels.map((g) => {
+        const tone = GROUP_TONE[g.info.kind];
+        return (
+          <View key={g.key} pointerEvents="none" accessibilityLabel={`${g.info.label}${g.info.points ? `, ${g.info.points} points` : ''}`}
+            style={{ position: 'absolute', left: g.x1, width: g.x2 - g.x1, top: st.y(298), alignItems: 'center' }}>
+            <View style={{ paddingHorizontal: z(6), height: z(14), borderRadius: z(7), backgroundColor: tone.bg, justifyContent: 'center', maxWidth: '100%' }}>
+              <Text numberOfLines={1} style={{ fontFamily: fonts.uiHeavy, fontSize: z(8.5), color: tone.fg }}>
+                {g.info.kind === 'pure' ? '✓ ' : ''}{g.info.kind !== 'invalid' ? g.info.label : g.info.label ? `${g.info.label} · ${g.info.points}` : `${g.info.points} pts`}
+              </Text>
+            </View>
+          </View>
+        );
+      })}
 
       {hand.map((card, i) => (
         <HandCard
@@ -410,14 +487,14 @@ export default function GameScreen() {
         st={st}
         modeName={mode}
         info={info}
-        pointsLabel="YOUR POINTS"
-        points={myPoints == null || dealing ? '–' : String(myPoints)}
+        pointsLabel="POINTS LEFT"
+        points={myPoints == null || dealing || hand.length < 13 ? '–' : String(myPoints)}
         canDiscard={canDiscard}
         canDeclare={!!table.canDiscard && !busy}
         onEmote={() => setEmoteOpen(true)}
         onLeave={() => setLeaveOpen(true)}
-        onSort={() => { tap(); setGrouped(false); setOrder(sortCards(hand).map((c) => c.id)); }}
-        onGroup={() => { tap(); setOrder(sortCards(hand).map((c) => c.id)); setGrouped(true); }}
+        onSort={() => { tap(); setGroups(null); setOrder(sortCards(hand).map((c) => c.id)); }}
+        onGroup={() => { tap(); setGroups(smartGroups(hand, wildRank)); }}
         onDiscard={() => { if (canDiscard) setDiscardingId(selected[0]); }}
         onDeclare={() => setDeclareOpen(true)}
       />

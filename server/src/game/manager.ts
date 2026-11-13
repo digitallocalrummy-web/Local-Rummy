@@ -419,6 +419,7 @@ export function openCodeTable(row: CodeRow, notify = false): Table {
   t.codeTableId = row.id;
   codeRows.set(row.id, row);
   t.holdStart = !row.autoStart;
+  t.jokerMode = row.jokerMode === 'closed' ? 'closed' : 'open';
   tables.set(t.id, t);
   db.update(schema.codeTables).set({ tableCode: t.id }).where(eq(schema.codeTables.id, row.id)).catch(() => {});
   const ms = Math.min(row.expiresAt.getTime() - Date.now(), 2 ** 31 - 1);

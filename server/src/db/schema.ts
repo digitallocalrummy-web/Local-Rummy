@@ -157,6 +157,8 @@ export const codeTables = pgTable('code_tables', {
   /** Player IDs (LR-xxxxx) allowed to join; empty = anyone with the code. */
   allow: jsonb('allow').$type<string[]>().notNull().default([]),
   autoStart: boolean('auto_start').notNull().default(true),
+  /** 'open': wild joker shown to all; 'closed': shown to a player once they have a pure sequence. */
+  jokerMode: text('joker_mode').notNull().default('open'),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   status: codeTableStatus('status').notNull().default('open'),
   /** Id of the live table (T-…) while open or playing, and of the finished game. */

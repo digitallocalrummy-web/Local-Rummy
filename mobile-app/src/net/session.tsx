@@ -55,7 +55,10 @@ export interface TableView {
   official?: boolean; autoStart?: boolean;
   hand: Card[]; canDraw: boolean; canDiscard: boolean; seats: SeatView[];
   open: { card: Card; by: number } | null; recent: { card: Card; by: number }[]; deckCount: number;
-  wild: Card | null; wildRank: string | null; turn: number; deadline: number | null; result: TableResult | null;
+  wild: Card | null; wildRank: string | null;
+  /** Closed joker: the wild card stays hidden (wild = null) until you make a pure sequence. */
+  jokerMode?: 'open' | 'closed'; jokerLocked?: boolean;
+  turn: number; deadline: number | null; result: TableResult | null;
 }
 export type TableEvent =
   | { type: 'dealt' } | { type: 'wild'; card: Card } | { type: 'turn'; seat: number; deadline: number | null }

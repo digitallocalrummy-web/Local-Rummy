@@ -205,6 +205,7 @@ export async function adminRoutes(app: FastifyInstance) {
         entry: z.number().int().min(0),
         allow: z.array(z.string().trim().toUpperCase()).max(10).default([]),
         autoStart: z.boolean().default(false),
+        jokerMode: z.enum(['open', 'closed']).default('open'),
         expiresInMinutes: z.number().int().min(5).max(7 * 24 * 60).optional(),
         expiresAt: z.string().datetime({ offset: true }).optional(),
       }).safeParse(req.body);
@@ -228,7 +229,7 @@ export async function adminRoutes(app: FastifyInstance) {
       if (expiresAt.getTime() > Date.now() + 7 * 24 * 3600_000) return reply.code(400).send({ error: 'Codes can last at most 7 days.' });
       const [row] = await db.insert(schema.codeTables).values({
         code: newTableCode(), title: b.title || null, mode: b.mode, players: b.players, entry: b.entry,
-        allow, autoStart: b.autoStart, expiresAt, createdBy: req.admin!.sub,
+        allow, autoStart: b.autoStart, jokerMode: b.jokerMode, expiresAt, createdBy: req.admin!.sub,
       }).returning();
       openCodeTable(row, true); // invited players get the invitation in the app right away
       return codeView(row);

@@ -1,0 +1,1 @@
+ALTER TABLE "code_tables" ADD COLUMN "joker_mode" text DEFAULT 'open' NOT NULL;
