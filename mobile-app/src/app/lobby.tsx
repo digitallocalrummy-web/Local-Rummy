@@ -4,27 +4,21 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { panelStyle, TableBackdrop } from '../components/Backdrop';
-import { PracticePane, QuickPlayPane } from '../components/LobbyPanes';
+import { CodePane, ProfilePane } from '../components/HomePanes';
 import { useStage } from '../game/Stage';
 import { AnimatedModal } from '../components/AnimatedModal';
 import { ChipBalance, formatChips } from '../components/ChipBalance';
 import { Crown } from '../components/Decor';
 import { GameButton } from '../components/GameButton';
-import { GameModeCard } from '../components/GameModeCard';
 import { PlayerAvatar } from '../components/PlayerAvatar';
-import { gameModes } from '../data/sample';
-import { FriendsPanel } from '../components/FriendsPanel';
-import { MODE_LABEL, TableSetup } from '../components/TableSetup';
-import { initialsOf, needsUpdate, photoUri, useSession, type ModeId } from '../net/session';
+import { initialsOf, needsUpdate, photoUri, useSession } from '../net/session';
 import { useLayout } from '../hooks/useLayout';
 import { useSettings } from '../state/settings';
 import { colors, fonts } from '../theme';
 
-const tabs: { id: 'fun' | 'quick' | 'practice' | 'friends'; label: string; heading: string; sub: string }[] = [
-  { id: 'fun', label: 'PLAY FOR FUN', heading: 'Choose a table', sub: 'Virtual chips only · No real money' },
-  { id: 'quick', label: 'QUICK PLAY', heading: 'Quick play · instant seat', sub: 'Pick your game, we seat you at the next open table' },
-  { id: 'practice', label: 'PRACTICE', heading: 'Practice vs AI', sub: 'Free tables to learn and warm up · no chips used' },
-  { id: 'friends', label: 'PLAY WITH FRIENDS', heading: 'Play with friends', sub: 'Private tables with people you know' },
+const tabs: { id: 'code' | 'profile'; label: string; heading: string; sub: string }[] = [
+  { id: 'code', label: 'PLAY WITH CODE', heading: 'Play with code', sub: 'Join a table with its code, or accept an invitation' },
+  { id: 'profile', label: 'PROFILE', heading: 'Your profile', sub: 'Your name, photo, player ID and stats' },
 ];
 
 /** Round header button (profile, settings, exit). */
@@ -45,9 +39,7 @@ export default function Lobby() {
   const { tap } = useSettings();
   const [tab, setTab] = useState(0);
   const [bonusOpen, setBonusOpen] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
-  const { me: player, config, claimBonus, refill } = useSession();
-  const [setup, setSetup] = useState<ModeId | null>(null);
+  const { me: player, claimBonus, refill, invites } = useSession();
   const [bonusMsg, setBonusMsg] = useState<string | null>(null);
   const me = {
     id: player?.id ?? 'me', name: player?.name ?? 'Player', initials: initialsOf(player?.name ?? 'Player'),
@@ -60,14 +52,6 @@ export default function Lobby() {
   }, [player]);
   const chips = me.chips;
   const t = tabs[tab];
-  const practice = t.id === 'practice';
-  const friends = t.id === 'friends';
-  const modes = (['points', 'pool', 'deals'] as ModeId[])
-    .filter((id) => config?.modes[id]?.enabled)
-    .map((id, i) => {
-      const c = config!.modes[id];
-      return { id, name: MODE_LABEL[id], seated: gameModes[i].seated, tagline: '', players: c.maxPlayers > 1 ? `1–${c.maxPlayers}` : '1', entry: c.entries[0] ?? 0 };
-    });
 
   return (
     <View style={{ flex: 1, backgroundColor: '#0B0906', overflow: 'hidden' }}>
@@ -88,10 +72,15 @@ export default function Lobby() {
                 style={{ minHeight: z(44), borderRadius: z(10), paddingHorizontal: z(12), flexDirection: 'row', alignItems: 'center', gap: z(10), backgroundColor: on ? 'rgba(232,198,106,0.14)' : 'transparent' }}>
                 <View style={{ width: z(6), height: z(6), borderRadius: z(3), backgroundColor: on ? colors.gold : 'rgba(255,255,255,0.25)' }} />
                 <Text style={{ flex: 1, fontFamily: fonts.uiHeavy, fontSize: z(11), letterSpacing: z(1), color: on ? colors.goldBright : '#C3CDE2' }}>{x.label}</Text>
+                {x.id === 'code' && invites.length > 0 && (
+                  <View accessibilityLabel={`${invites.length} invitations`} style={{ minWidth: z(18), height: z(18), borderRadius: z(9), paddingHorizontal: z(5), backgroundColor: '#C8343B', alignItems: 'center', justifyContent: 'center' }}>
+                    <Text style={{ fontFamily: fonts.uiHeavy, fontSize: z(10), color: '#fff' }}>{invites.length}</Text>
+                  </View>
+                )}
               </Pressable>
             );
           })}
-          <Pressable onPress={() => setProfileOpen(true)} accessibilityRole="button" accessibilityLabel="Open profile"
+          <Pressable onPress={() => { tap(); setTab(1); }} accessibilityRole="button" accessibilityLabel="Open profile"
             style={{ marginTop: 'auto', flexDirection: 'row', alignItems: 'center', gap: z(8), paddingHorizontal: z(6), paddingTop: z(8) }}>
             <PlayerAvatar player={me} size={z(34)} />
             <View style={{ flex: 1 }}>
@@ -112,25 +101,13 @@ export default function Lobby() {
             <View style={{ height: z(34), paddingHorizontal: z(10), borderRadius: z(17), borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)', backgroundColor: 'rgba(255,255,255,0.05)', justifyContent: 'center' }}>
               <Text style={{ fontFamily: fonts.uiHeavy, fontSize: z(11), color: colors.text }}>ENG</Text>
             </View>
-            <HeadBtn z={z} label="Profile" onPress={() => setProfileOpen(true)}><User size={z(16)} color="#EEF1F8" /></HeadBtn>
+            <HeadBtn z={z} label="Profile" onPress={() => { tap(); setTab(1); }}><User size={z(16)} color="#EEF1F8" /></HeadBtn>
             <HeadBtn z={z} label="Settings" onPress={() => router.push('/settings')}><Settings size={z(16)} color="#EEF1F8" /></HeadBtn>
             <HeadBtn z={z} label="Exit to welcome screen" onPress={() => router.replace('/')}><LogOut size={z(16)} color="#EEF1F8" /></HeadBtn>
           </View>
 
           <Animated.View key={tab} entering={FadeInDown.duration(300)} style={{ flex: 1, flexDirection: 'row', gap: z(12) }}>
-            {t.id === 'friends' ? (
-              <FriendsPanel s={s} onCreate={(id) => setSetup(id)} />
-            ) : t.id === 'quick' ? (
-              <QuickPlayPane z={z} />
-            ) : t.id === 'practice' ? (
-              <PracticePane z={z} />
-            ) : modes.length ? (
-              modes.map((m, i) => <GameModeCard key={m.id} mode={m} index={i} s={s} onPlay={() => { tap(); setSetup(m.id); }} />)
-            ) : (
-              <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ fontFamily: fonts.uiBold, fontSize: z(13), color: '#B5BFD3' }}>No tables are open right now. Please check back soon.</Text>
-              </View>
-            )}
+            {t.id === 'code' ? <CodePane z={z} /> : <ProfilePane z={z} />}
           </Animated.View>
         </View>
       </Animated.View>
@@ -166,28 +143,7 @@ export default function Lobby() {
         </View>
       </AnimatedModal>
 
-      <AnimatedModal visible={profileOpen} title="PROFILE" onClose={() => setProfileOpen(false)} width={460}>
-        <View style={{ flexDirection: 'row', gap: 16 * s, alignItems: 'center' }}>
-          <PlayerAvatar player={me} size={64 * s} />
-          <View style={{ flex: 1, gap: 4 * s }}>
-            <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 18 * s, color: colors.textWhite }}>{me.name}</Text>
-            <Text style={{ fontFamily: fonts.ui, fontSize: 12 * s, color: colors.textMutedGreen }}>Level {me.level} · Player ID {player?.code}</Text>
-            <View style={{ flexDirection: 'row', marginTop: 4 * s }}>
-              <GameButton s={s} variant="outline" height={34} label="EDIT PROFILE" onPress={() => { setProfileOpen(false); router.push('/profile'); }} />
-            </View>
-            <View style={{ flexDirection: 'row', gap: 18 * s, marginTop: 6 * s }}>
-              {[[String(player?.gamesPlayed ?? 0), 'Games'], [`${player?.gamesPlayed ? Math.round((player.gamesWon / player.gamesPlayed) * 100) : 0}%`, 'Win rate'], [formatChips(chips), 'Chips']].map(([v, l]) => (
-                <View key={l}>
-                  <Text style={{ fontFamily: fonts.display, fontSize: 18 * s, color: colors.goldBright }}>{v}</Text>
-                  <Text style={{ fontFamily: fonts.ui, fontSize: 10 * s, color: colors.textMutedGreen }}>{l}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
-        </View>
-      </AnimatedModal>
 
-      <TableSetup key={`${setup}-${practice}-${friends}`} s={s} mode={setup} free={practice} privateTable={friends} onClose={() => setSetup(null)} />
       <ConnectionGate s={s} />
     </View>
   );

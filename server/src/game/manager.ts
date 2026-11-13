@@ -47,6 +47,7 @@ const hooks = {
   onChange(t: Table) {
     if (t.codeTableId && t.phase === 'playing' && !codeStarted.has(t.codeTableId)) {
       codeStarted.add(t.codeTableId);
+      closeInvites(t);
       db.update(schema.codeTables).set({ status: 'playing', startedAt: new Date() }).where(eq(schema.codeTables.id, t.codeTableId)).catch(() => {});
     }
     if (!io) return;
@@ -231,7 +232,9 @@ export function attachSockets(server: Server) {
   io.on('connection', (socket: Socket) => {
     const playerId: string = socket.data.playerId;
     socket.join(playerRoom(playerId));
+    online.set(playerId, (online.get(playerId) ?? 0) + 1);
     socket.emit('config', publicConfig());
+    socket.emit('invites', invitesFor(playerId));
     db.update(schema.players).set({ lastActiveAt: new Date() }).where(eq(schema.players.id, playerId)).catch(() => {});
 
     const current = () => { const id = playerTable.get(playerId); return id ? tables.get(id) : undefined; };
@@ -320,7 +323,16 @@ export function attachSockets(server: Server) {
       done({ ok: true });
     });
 
+    socket.on('invite:decline', (msg: { id?: number }, ack) => {
+      const t = codeTableLive(Number(msg?.id));
+      const inv = t?.invitees.find((i) => i.playerId === playerId);
+      if (t && inv) { inv.declined = true; hooks.onChange(t); }
+      safeAck(ack)({ ok: true });
+    });
+
     socket.on('disconnect', async () => {
+      const n = (online.get(playerId) ?? 1) - 1;
+      if (n <= 0) online.delete(playerId); else online.set(playerId, n);
       const stillHere = (await io!.in(playerRoom(playerId)).fetchSockets()).length > 0;
       if (stillHere) return;
       const t = current();
@@ -401,16 +413,80 @@ export function newTableCode() {
 type CodeRow = typeof schema.codeTables.$inferSelect;
 
 /** Opens the live table for a code table row and schedules its expiry. */
-export function openCodeTable(row: CodeRow): Table {
+export function openCodeTable(row: CodeRow, notify = false): Table {
   const t = new Table(row.mode as ModeId, row.players, row.entry, getConfig(), hooks);
   t.privateCode = row.code;
   t.codeTableId = row.id;
+  codeRows.set(row.id, row);
   t.holdStart = !row.autoStart;
   tables.set(t.id, t);
   db.update(schema.codeTables).set({ tableCode: t.id }).where(eq(schema.codeTables.id, row.id)).catch(() => {});
   const ms = Math.min(row.expiresAt.getTime() - Date.now(), 2 ** 31 - 1);
   expiryTimers.set(row.id, setTimeout(() => { expireCodeTable(row.id).catch(() => {}); }, Math.max(0, ms)));
+  if (row.allow.length) {
+    db.query.players.findMany({ where: inArray(schema.players.code, row.allow) }).then((ps) => {
+      t.invitees = ps.map((p) => ({ playerId: p.id, code: p.code, name: p.name, avatar: p.avatar, photo: photoPath(p) }));
+      if (notify) for (const i of t.invitees) io?.to(playerRoom(i.playerId)).emit('invite', invitePayload(t, row));
+      hooks.onChange(t);
+    }).catch((e) => console.error('invitees failed', e));
+  }
   return t;
+}
+
+// ---------- invitations
+
+const online = new Map<string, number>();
+const codeRows = new Map<number, CodeRow>();
+
+/** Players with the app open right now. */
+export function onlinePlayerIds() { return [...online.keys()]; }
+export function isOnline(playerId: string) { return online.has(playerId); }
+/** Where an online player is: at a table (and which) or in the lobby. */
+export function playerWhere(playerId: string) {
+  const id = playerTable.get(playerId);
+  const t = id ? tables.get(id) : undefined;
+  return t && t.phase !== 'ended' ? { tableId: t.id, phase: t.phase, code: t.privateCode, official: t.codeTableId != null } : null;
+}
+
+function invitePayload(t: Table, row: CodeRow) {
+  codeRows.set(row.id, row);
+  return {
+    id: row.id, code: `LR-${row.code}`, title: row.title, mode: row.mode, players: row.players, entry: row.entry,
+    expiresAt: row.expiresAt, joined: t.humans.map((s) => ({ name: s.name, avatar: s.avatar ?? null, photo: s.photo ?? null })),
+  };
+}
+
+/** Open invitations for a player (sent when their app connects). */
+function invitesFor(playerId: string) {
+  const out: ReturnType<typeof invitePayload>[] = [];
+  for (const t of tables.values()) {
+    if (!t.codeTableId || t.phase !== 'waiting' || t.seatOf(playerId)) continue;
+    const inv = t.invitees.find((i) => i.playerId === playerId);
+    const row = codeRows.get(t.codeTableId);
+    if (inv && !inv.declined && row) out.push(invitePayload(t, row));
+  }
+  return out;
+}
+
+/** Tell invited players who haven't joined that the invitation is over. */
+function closeInvites(t: Table) {
+  for (const i of t.invitees) if (!t.seatOf(i.playerId)) io?.to(playerRoom(i.playerId)).emit('invite:closed', { id: t.codeTableId });
+}
+
+/** Admin: send the invitation again to invited players who haven't joined (clears declines). */
+export function renotifyCodeTable(id: number): number {
+  const t = codeTableLive(id);
+  const row = codeRows.get(id);
+  if (!t || !row || t.phase !== 'waiting') return 0;
+  let n = 0;
+  for (const i of t.invitees) {
+    if (t.seatOf(i.playerId)) continue;
+    i.declined = false;
+    io?.to(playerRoom(i.playerId)).emit('invite', invitePayload(t, row));
+    n += 1;
+  }
+  hooks.onChange(t);
+  return n;
 }
 
 export function codeTableLive(id: number) {
@@ -423,6 +499,7 @@ function sendHome(playerId: string, message: string) {
 }
 
 async function closeWaiting(t: Table, message: string) {
+  closeInvites(t);
   for (const s of [...t.humans]) if (s.playerId) { await leaveWaiting(s.playerId, t).catch(() => {}); sendHome(s.playerId, message); }
   t.dispose(); tables.delete(t.id);
 }

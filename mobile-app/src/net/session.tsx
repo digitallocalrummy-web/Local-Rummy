@@ -33,6 +33,11 @@ export interface ProfilePatch { name?: string; avatar?: string; photo?: string; 
 
 /** Full URL for a photo path from the server, or null. */
 export const photoUri = (path: string | null | undefined) => (path ? `${API_URL}${path}` : null);
+/** An admin invitation to a code table. */
+export interface Invite {
+  id: number; code: string; title: string | null; mode: ModeId; players: number; entry: number; expiresAt: string;
+  joined: { name: string; avatar: string | null; photo: string | null }[];
+}
 export interface Banner { id: number; title: string; subtitle: string; color: string; target: string }
 
 export interface SeatView {
@@ -45,6 +50,7 @@ export interface TableView {
   id: string; mode: ModeId; size: number; entry: number; phase: 'waiting' | 'playing' | 'ended'; you: number;
   /** Play with Friends: the code to share, and which seat is the host (-1 for public tables). */
   privateCode: string | null; host: number;
+  invitees?: { name: string; avatar: string | null; photo: string | null; joined: boolean; declined: boolean }[];
   /** Admin code table: shown as an official table; autoStart false = the organiser presses Start. */
   official?: boolean; autoStart?: boolean;
   hand: Card[]; canDraw: boolean; canDiscard: boolean; seats: SeatView[];
@@ -70,6 +76,10 @@ interface SessionValue {
   table: TableView | null;
   /** Why we were sent away from a table (removed, cancelled, expired), until the next table. */
   notice: string | null;
+  /** Open invitations from the admin, newest first. */
+  invites: Invite[];
+  joinInvite: (inv: Invite) => Promise<Ack>;
+  declineInvite: (inv: Invite) => void;
   /** The last finished deal, kept for the result screen. */
   lastResult: { result: TableResult; table: TableView } | null;
   retry: () => void;
@@ -120,6 +130,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [connected, setConnected] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [invites, setInvites] = useState<Invite[]>([]);
   const [table, setTable] = useState<TableView | null>(null);
   const [lastResult, setLastResult] = useState<SessionValue['lastResult']>(null);
   const token = useRef<string | null>(null);
@@ -172,6 +183,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         s.on('table', (v: TableView) => { tableRef.current = v; setTable(v); setNotice(null); });
         // the organiser removed us, or cancelled / expired the table before it started
         s.on('removed', (m: { message: string }) => { tableRef.current = null; setTable(null); setNotice(m.message); });
+        s.on('invites', (list: Invite[]) => setInvites(list));
+        s.on('invite', (inv: Invite) => setInvites((l) => [inv, ...l.filter((x) => x.id !== inv.id)]));
+        s.on('invite:closed', (m: { id: number }) => setInvites((l) => l.filter((x) => x.id !== m.id)));
         s.on('event', (e: TableEvent) => {
           if (e.type === 'ended' && tableRef.current) setLastResult({ result: e.result, table: tableRef.current });
           listeners.current.forEach((fn) => fn(e));
@@ -197,7 +211,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const refreshMe = useCallback(async () => { setMe(await call<Me>('/api/me')); }, [call]);
 
   const value = useMemo<SessionValue>(() => ({
-    status, error, me, config, banners, connected, table, notice, lastResult,
+    status, error, me, config, banners, connected, table, notice, invites, lastResult,
     retry: () => setAttempt((a) => a + 1),
     refreshMe,
     claimBonus: async () => {
@@ -227,6 +241,16 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setTable(null); tableRef.current = null; setLastResult(null);
       return emit('private:join', { code });
     },
+    joinInvite: async (inv) => {
+      setTable(null); tableRef.current = null; setLastResult(null);
+      const r = await emit('private:join', { code: inv.code });
+      setInvites((l) => l.filter((x) => x.id !== inv.id));
+      return r;
+    },
+    declineInvite: (inv) => {
+      setInvites((l) => l.filter((x) => x.id !== inv.id));
+      emit('invite:decline', { id: inv.id }).catch(() => {});
+    },
     startPrivate: (fillAi) => emit('private:start', { fillAi }),
     draw: (from) => emit('draw', { from }),
     discard: (cardId) => emit('discard', { cardId }),
@@ -237,7 +261,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     onEvent: (fn) => { listeners.current.add(fn); return () => { listeners.current.delete(fn); }; },
     sendTicket: async (t) => { await call('/api/tickets', { body: t }); },
     tickets: () => call<any[]>('/api/tickets'),
-  }), [status, error, me, config, banners, connected, table, notice, lastResult, call, emit, refreshMe]);
+  }), [status, error, me, config, banners, connected, table, notice, invites, lastResult, call, emit, refreshMe]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

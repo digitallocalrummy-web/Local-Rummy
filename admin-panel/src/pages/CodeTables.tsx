@@ -33,6 +33,7 @@ export default function CodeTables() {
   const [f, setF] = useState<F>('active');
   const [sel, setSel] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
+  const [picked, setPicked] = useState<Map<string, any>>(new Map());
   const panel = useRef<HTMLDivElement>(null);
   const list = useQuery({ queryKey: ['code-tables', f], queryFn: () => api(`/api/admin/code-tables?status=${f}`), refetchInterval: 3_000 });
   const rows: any[] = list.data?.rows ?? [];
@@ -47,6 +48,7 @@ export default function CodeTables() {
       <PageHeader title="Code tables" sub="Create a table, share its code with players, and follow it from the first seat to the final result.">
         {canEdit && <Button variant="gold" onClick={() => setCreating(true)}>+ Create code table</Button>}
       </PageHeader>
+      <OnlinePlayers picked={picked} setPicked={setPicked} canEdit={canEdit} onInvite={() => setCreating(true)} />
       <Chips label="Show" value={f} onChange={(v) => { setF(v); setSel(null); }} options={[{ value: 'active', label: 'Active' }, { value: 'ended', label: 'Ended' }, { value: 'all', label: 'All' }]} />
 
       <section className="flex flex-wrap items-start gap-4">
@@ -88,8 +90,65 @@ export default function CodeTables() {
         {selId != null && <div ref={panel} className="flex min-w-0 flex-[1_1_380px] scroll-mt-16"><Detail id={selId} canEdit={canEdit} /></div>}
       </section>
 
-      {creating && <CreateDialog onClose={() => setCreating(false)} onCreated={(row) => { setCreating(false); setF('active'); setSel(row.id); qc.invalidateQueries({ queryKey: ['code-tables'] }); }} />}
+      {creating && <CreateDialog preset={[...picked.values()]} onClose={() => setCreating(false)} onCreated={(row) => { setCreating(false); setPicked(new Map()); setF('active'); setSel(row.id); qc.invalidateQueries({ queryKey: ['code-tables'] }); }} />}
     </>
+  );
+}
+
+// ---------------------------------------------------------------- online players
+
+function OnlinePlayers({ picked, setPicked, canEdit, onInvite }: { picked: Map<string, any>; setPicked: (m: Map<string, any>) => void; canEdit: boolean; onInvite: () => void }) {
+  const q = useQuery({ queryKey: ['online-players'], queryFn: () => api('/api/admin/online-players'), refetchInterval: 4_000 });
+  const rows: any[] = q.data?.rows ?? [];
+  const [find, setFind] = useState('');
+  const shown = rows.filter((p) => !find.trim() || `${p.name} ${p.code}`.toLowerCase().includes(find.trim().toLowerCase()));
+  const toggle = (p: any) => {
+    const m = new Map(picked);
+    if (m.has(p.id)) m.delete(p.id); else m.set(p.id, p);
+    setPicked(m);
+  };
+  const free = shown.filter((p) => p.where === 'lobby');
+  const allOn = free.length > 0 && free.every((p) => picked.has(p.id));
+  return (
+    <Card title={<span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-ok" aria-hidden="true" />Players online now · {rows.length}</span>}
+      action={canEdit && (
+        <Button variant="gold" disabled={picked.size < 2} onClick={onInvite}>
+          {picked.size < 2 ? 'Tick 2 or more to invite' : `Create table for ${picked.size} selected`}
+        </Button>
+      )}>
+      <div className="mb-3 flex flex-wrap items-center gap-3">
+        <label htmlFor="op-find" className="sr-only">Find an online player</label>
+        <input id="op-find" value={find} onChange={(e) => setFind(e.target.value)} placeholder="Find by name or Player ID" className={cx(inputCls, 'max-w-[280px]')} />
+        {canEdit && free.length > 0 && (
+          <label className="flex cursor-pointer items-center gap-2 text-xs font-bold text-soft">
+            <input type="checkbox" checked={allOn} onChange={() => { const m = new Map(picked); for (const p of free) { if (allOn) m.delete(p.id); else m.set(p.id, p); } setPicked(m); }} className="h-4 w-4 accent-[var(--color-gold)]" />
+            Select everyone in the lobby
+          </label>
+        )}
+        {picked.size > 0 && <button onClick={() => setPicked(new Map())} className="cursor-pointer border-0 bg-transparent text-xs font-bold text-mute underline">Clear selection ({picked.size})</button>}
+      </div>
+      {shown.length ? (
+        <ul className="m-0 grid list-none grid-cols-[repeat(auto-fill,minmax(230px,1fr))] gap-2 p-0">
+          {shown.map((p) => {
+            const on = picked.has(p.id);
+            const busy = p.where !== 'lobby';
+            return (
+              <li key={p.id}>
+                <label className={cx('flex cursor-pointer items-center gap-2.5 rounded-xl border px-2.5 py-2', on ? 'border-gold/60 bg-gold/10' : 'border-line bg-raised hover:border-line2', !canEdit && 'cursor-default')}>
+                  {canEdit && <input type="checkbox" checked={on} onChange={() => toggle(p)} className="h-4 w-4 flex-none accent-[var(--color-gold)]" aria-label={`Select ${p.name}`} />}
+                  <Avatar name={p.name} color={p.color} emoji={p.avatar} photo={p.photoUrl} size={34} />
+                  <span className="min-w-0 flex-1 text-[13px]">
+                    <b className="block truncate">{p.name}</b>
+                    <span className="block truncate text-[11px] text-mute"><span className="font-mono text-gold2">{p.code}</span> · {fmt(p.chips)} chips</span>
+                  </span>
+                  <Pill tone={busy ? (p.where === 'playing' ? 'warn' : 'info') : 'ok'}>{busy ? (p.where === 'playing' ? 'Playing' : 'Waiting') : 'Lobby'}</Pill>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+      ) : <Empty>{q.isLoading ? 'Loading…' : rows.length ? 'No one matches.' : 'Nobody has the app open right now. Players appear here as soon as they open Local Rummy.'}</Empty>}
+    </Card>
   );
 }
 
@@ -108,6 +167,11 @@ function Detail({ id, canEdit }: { id: number; canEdit: boolean }) {
       setMsg({ tone: 'ok', text: v.path === 'start' ? 'Game started.' : v.path === 'cancel' ? 'Table cancelled. Every entry was refunded.' : 'Player removed and refunded.' });
       qc.invalidateQueries({ queryKey: ['code-table', id] }); qc.invalidateQueries({ queryKey: ['code-tables'] });
     },
+    onError: (e: Error) => setMsg({ tone: 'bad', text: e.message }),
+  });
+  const notify = useMutation({
+    mutationFn: () => api(`/api/admin/code-tables/${id}/notify`, { body: {} }),
+    onSuccess: (r: any) => setMsg({ tone: 'ok', text: `Invitation sent again to ${r.sent} player${r.sent === 1 ? '' : 's'}.` }),
     onError: (e: Error) => setMsg({ tone: 'bad', text: e.message }),
   });
   const d = q.data;
@@ -153,6 +217,27 @@ function Detail({ id, canEdit }: { id: number; canEdit: boolean }) {
       </dl>
 
       {msg && <Toast tone={msg.tone}>{msg.text}</Toast>}
+
+      {/* invited players and their answer */}
+      {d.status === 'open' && d.invited?.length > 0 && (
+        <>
+          <div className="flex items-center gap-2">
+            <Label className="flex-1">Invited · {d.invited.filter((i: any) => i.state === 'joined').length} of {d.invited.length} joined</Label>
+            {canEdit && d.invited.some((i: any) => i.state !== 'joined') && (
+              <Button className="!h-8 !px-2.5 !text-xs" onClick={() => notify.mutate()} disabled={notify.isPending}>Notify again</Button>
+            )}
+          </div>
+          <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
+            {d.invited.map((i: any) => (
+              <li key={i.playerId} className="flex items-center gap-2 rounded-full bg-raised py-1 pr-2.5 pl-1">
+                <Avatar name={i.name} color="#1F6B4A" emoji={i.avatar} photo={i.photoUrl} size={24} />
+                <span className="text-xs font-bold">{i.name}</span>
+                {i.state === 'joined' ? <Pill tone="ok">Joined</Pill> : i.state === 'declined' ? <Pill tone="bad">Not now</Pill> : i.state === 'online' ? <Pill tone="info">Invited</Pill> : <Pill tone="warn">Offline</Pill>}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
 
       {/* waiting: who joined */}
       {d.status === 'open' && (
@@ -245,19 +330,19 @@ function Detail({ id, canEdit }: { id: number; canEdit: boolean }) {
 
 const EXPIRY = [{ value: 15, label: '15 min' }, { value: 60, label: '1 hour' }, { value: 180, label: '3 hours' }, { value: 1440, label: '24 hours' }, { value: -1, label: 'Set time' }];
 
-function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (row: any) => void }) {
+function CreateDialog({ onClose, onCreated, preset }: { onClose: () => void; onCreated: (row: any) => void; preset: any[] }) {
   const cfg = useQuery({ queryKey: ['config'], queryFn: () => api('/api/admin/config') });
   const modes = cfg.data?.config?.modes ?? cfg.data?.modes;
   const enabled = (['points', 'pool', 'deals'] as const).filter((m) => modes?.[m]?.enabled);
   const [mode, setMode] = useState<string>('points');
   const m = modes?.[mode];
-  const [players, setPlayers] = useState(4);
+  const [players, setPlayers] = useState(Math.max(2, preset.length || 4));
   const [entry, setEntry] = useState(0);
-  const [who, setWho] = useState<'anyone' | 'list'>('anyone');
-  const [ids, setIds] = useState('');
+  const [who, setWho] = useState<'anyone' | 'list'>(preset.length ? 'list' : 'anyone');
+  const [ids, setIds] = useState(preset.map((p) => p.code).join(', '));
   const [exp, setExp] = useState(60);
   const [at, setAt] = useState('');
-  const [auto, setAuto] = useState(true);
+  const [auto, setAuto] = useState(false);
   const [title, setTitle] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const dialog = useRef<HTMLDivElement>(null);
@@ -315,9 +400,18 @@ function CreateDialog({ onClose, onCreated }: { onClose: () => void; onCreated: 
             <fieldset className="m-0 flex flex-col gap-2 border-0 p-0">
               <legend className="mb-1.5 text-[11px] font-extrabold tracking-[1.4px] text-mute uppercase">Who can join</legend>
               <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="radio" name="who" checked={who === 'anyone'} onChange={() => setWho('anyone')} /> Anyone with the code</label>
-              <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="radio" name="who" checked={who === 'list'} onChange={() => setWho('list')} /> Only these players</label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="radio" name="who" checked={who === 'list'} onChange={() => setWho('list')} /> Only invited players (they get a notification in the app)</label>
+              {who === 'list' && preset.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {preset.map((p) => (
+                    <span key={p.id} className="flex items-center gap-1.5 rounded-full bg-raised py-1 pr-2.5 pl-1 text-xs font-bold">
+                      <Avatar name={p.name} color={p.color} emoji={p.avatar} photo={p.photoUrl} size={22} />{p.name} <span className="font-mono text-[10px] text-gold2">{p.code}</span>
+                    </span>
+                  ))}
+                </div>
+              )}
               {who === 'list' && (
-                <Field label="Player IDs" id="ct-ids" hint="Separate with commas or spaces, e.g. LR-48217, LR-11529. Players see their ID in Profile.">
+                <Field label="Player IDs" id="ct-ids" hint="Ticked players are filled in. Add more by Player ID, separated by commas or spaces. Players see their ID in Profile.">
                   <textarea id="ct-ids" value={ids} onChange={(e) => setIds(e.target.value)} rows={2} className={cx(inputCls, '!h-auto py-2 font-mono')} placeholder="LR-48217, LR-11529" />
                 </Field>
               )}

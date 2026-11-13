@@ -3,6 +3,7 @@ import { LibreBaskerville_700Bold } from '@expo-google-fonts/libre-baskerville';
 import { Manrope_500Medium, Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold } from '@expo-google-fonts/manrope';
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
+import { InvitePopup } from '../components/InvitePopup';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -60,6 +61,8 @@ export default function RootLayout() {
             <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="profile" options={{ animation: 'fade' }} />
           </Stack>
+          {/* admin invitations pop up over any screen */}
+          <InvitePopup />
           </SessionProvider>
         </SettingsProvider>
       </SafeAreaProvider>

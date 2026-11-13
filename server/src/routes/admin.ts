@@ -7,7 +7,7 @@ import { requireAdmin, signAdmin } from '../auth';
 import { configSchema, getConfig, getConfigMeta, saveConfig } from '../config';
 import { db, schema } from '../db';
 import { photoPath } from './player';
-import { cancelCodeTable, cancelTable, codeTableLive, kickPlayer, liveTables, messageTable, newTableCode, onlineCount, openCodeTable, pushWallet, removeFromCodeTable, skipTurn, startCodeTable } from '../game/manager';
+import { cancelCodeTable, cancelTable, codeTableLive, isOnline, kickPlayer, liveTables, messageTable, newTableCode, onlineCount, onlinePlayerIds, openCodeTable, playerWhere, pushWallet, removeFromCodeTable, renotifyCodeTable, skipTurn, startCodeTable } from '../game/manager';
 import { sendPush } from '../push';
 import { InsufficientChips, moveChips } from '../wallet';
 import { bonusState, istDay } from './player';
@@ -189,7 +189,12 @@ export async function adminRoutes(app: FastifyInstance) {
         };
       }) : [];
       const creator = row.createdBy ? await db.query.admins.findFirst({ where: eq(schema.admins.id, row.createdBy), columns: { name: true } }) : null;
-      return { ...codeView(row), createdByName: creator?.name ?? null, joined, table: t && t.phase !== 'waiting' ? t.adminView() : null };
+      // invited players and where each one is: joined, declined, waiting (online) or offline
+      const invited = t ? t.invitees.map((i) => ({
+        playerId: i.playerId, code: i.code, name: i.name, avatar: i.avatar, photoUrl: i.photo,
+        state: t.seatOf(i.playerId) ? 'joined' : i.declined ? 'declined' : isOnline(i.playerId) ? 'online' : 'offline',
+      })) : [];
+      return { ...codeView(row), createdByName: creator?.name ?? null, joined, invited, table: t && t.phase !== 'waiting' ? t.adminView() : null };
     });
 
     r.post('/api/admin/code-tables', canEdit, async (req, reply) => {
@@ -199,7 +204,7 @@ export async function adminRoutes(app: FastifyInstance) {
         players: z.number().int().min(2).max(10),
         entry: z.number().int().min(0),
         allow: z.array(z.string().trim().toUpperCase()).max(10).default([]),
-        autoStart: z.boolean().default(true),
+        autoStart: z.boolean().default(false),
         expiresInMinutes: z.number().int().min(5).max(7 * 24 * 60).optional(),
         expiresAt: z.string().datetime({ offset: true }).optional(),
       }).safeParse(req.body);
@@ -216,6 +221,7 @@ export async function adminRoutes(app: FastifyInstance) {
         const missing = allow.filter((c) => !found.some((f) => f.code === c));
         if (missing.length) return reply.code(400).send({ error: `No player with ID ${missing.join(', ')}.` });
         if (allow.length < 2) return reply.code(400).send({ error: 'Invite at least 2 players, or leave the list empty for anyone with the code.' });
+        if (allow.length > b.players) return reply.code(400).send({ error: `You invited ${allow.length} players but the table has ${b.players} seats.` });
       }
       const expiresAt = b.expiresAt ? new Date(b.expiresAt) : new Date(Date.now() + (b.expiresInMinutes ?? 60) * 60_000);
       if (expiresAt.getTime() < Date.now() + 60_000) return reply.code(400).send({ error: 'Choose an expiry time in the future.' });
@@ -224,8 +230,30 @@ export async function adminRoutes(app: FastifyInstance) {
         code: newTableCode(), title: b.title || null, mode: b.mode, players: b.players, entry: b.entry,
         allow, autoStart: b.autoStart, expiresAt, createdBy: req.admin!.sub,
       }).returning();
-      openCodeTable(row);
+      openCodeTable(row, true); // invited players get the invitation in the app right away
       return codeView(row);
+    });
+
+    r.post('/api/admin/code-tables/:id/notify', canEdit, async (req, reply) => {
+      const n = renotifyCodeTable(Number((req.params as { id: string }).id));
+      return n ? { ok: true, sent: n } : reply.code(400).send({ error: 'Nobody left to notify.' });
+    });
+
+    /** Players with the app open right now, for picking who to invite. */
+    r.get('/api/admin/online-players', async () => {
+      const ids = onlinePlayerIds();
+      const ps = ids.length ? await db.query.players.findMany({ where: inArray(schema.players.id, ids) }) : [];
+      return {
+        rows: ps.filter((p) => p.status !== 'blocked').map((p) => {
+          const w = playerWhere(p.id);
+          return {
+            id: p.id, code: p.code, name: p.name, color: p.color, avatar: p.avatar, photoUrl: photoPath(p), chips: p.chips, level: p.level,
+            device: p.device, phone: p.phone,
+            where: w ? (w.phase === 'playing' ? 'playing' : 'waiting') : 'lobby',
+            whereLabel: w ? (w.phase === 'playing' ? 'Playing a game' : w.official ? `Waiting at LR-${w.code}` : 'Waiting at a table') : 'In the lobby',
+          };
+        }).sort((a, b) => (a.where === 'lobby' ? 0 : 1) - (b.where === 'lobby' ? 0 : 1) || a.name.localeCompare(b.name)),
+      };
     });
 
     r.post('/api/admin/code-tables/:id/start', canEdit, async (req, reply) => {

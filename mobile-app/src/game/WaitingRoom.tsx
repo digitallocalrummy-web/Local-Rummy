@@ -73,7 +73,15 @@ export function WaitingRoom({ table, rect, s }: { table: TableView; rect: Rect; 
             {p.idx === table.host && <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 8 * s, letterSpacing: 1, color: colors.gold }}>HOST</Text>}
           </View>
         ))}
-        {Array.from({ length: Math.max(0, table.size - humans) }, (_, i) => (
+        {/* invited players who haven't joined yet */}
+        {(table.invitees ?? []).filter((i) => !i.joined).map((p, i) => (
+          <View key={`inv${i}`} style={{ alignItems: 'center', gap: 2 * s, width: 64 * s, opacity: p.declined ? 0.45 : 0.75 }}>
+            <PlayerAvatar player={{ name: p.name, initials: p.name.slice(0, 2).toUpperCase(), color: '#3A4440', avatar: p.avatar, photo: photoUri(p.photo) }} size={34 * s} />
+            <Text numberOfLines={1} style={{ fontFamily: fonts.uiBold, fontSize: 10 * s, color: colors.textWhite }}>{p.name}</Text>
+            <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 8 * s, letterSpacing: 1, color: p.declined ? '#E9A0A0' : colors.textMuted }}>{p.declined ? 'NOT COMING' : 'INVITED'}</Text>
+          </View>
+        ))}
+        {Array.from({ length: Math.max(0, table.size - humans - (table.invitees ?? []).filter((i) => !i.joined && !i.declined).length) }, (_, i) => (
           <View key={`e${i}`} style={{ alignItems: 'center', gap: 2 * s, width: 64 * s }}>
             <View style={{ width: 34 * s, height: 34 * s, borderRadius: 17 * s, borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(232,198,106,0.5)' }} />
             <Text style={{ fontFamily: fonts.ui, fontSize: 10 * s, color: colors.textMuted }}>Open seat</Text>

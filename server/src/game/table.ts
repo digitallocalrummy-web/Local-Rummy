@@ -93,6 +93,8 @@ export class Table {
   codeTableId: number | null = null;
   /** Admin code tables with auto-start off: wait for the admin even when every seat is filled. */
   holdStart = false;
+  /** Players the admin invited to this code table (and whether they declined). */
+  invitees: { playerId: string; code: string; name: string; avatar: string | null; photo: string | null; declined?: boolean }[] = [];
   private timers = new Set<NodeJS.Timeout>();
   private turnTimer: NodeJS.Timeout | null = null;
 
@@ -391,6 +393,7 @@ export class Table {
       /** Admin code table: shows as an official table; autoStart tells players what to expect. */
       official: this.codeTableId != null,
       autoStart: !this.holdStart,
+      invitees: this.invitees.map((i) => ({ name: i.name, avatar: i.avatar, photo: i.photo, joined: !!this.seatOf(i.playerId), declined: !!i.declined })),
       host: this.hostId ? this.seats.findIndex((x) => x.playerId === this.hostId) : -1,
       entry: this.entry,
       phase: this.phase,
