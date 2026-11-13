@@ -7,6 +7,7 @@ import { Shell } from './components/Shell';
 import './index.css';
 import { applyTheme, readTheme } from './theme';
 import Chips from './pages/Chips';
+import CodeTables from './pages/CodeTables';
 import Content from './pages/Content';
 import GameSetup from './pages/GameSetup';
 import LiveTables from './pages/LiveTables';
@@ -40,6 +41,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="support" element={<Support />} />
               <Route path="games" element={<GameSetup />} />
               <Route path="tables" element={<LiveTables />} />
+              <Route path="code-tables" element={<CodeTables />} />
               <Route path="chips" element={<Chips />} />
               <Route path="reports" element={<Reports />} />
               <Route path="content" element={<Content />} />

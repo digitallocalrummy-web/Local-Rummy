@@ -139,3 +139,32 @@ export const ticketMessages = pgTable('ticket_messages', {
   body: text('body').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * Code tables: an admin creates a table and shares its code; players join with the code.
+ * The live table exists while status is 'open' or 'playing'; the report is kept after it ends.
+ */
+export const codeTableStatus = pgEnum('code_table_status', ['open', 'playing', 'finished', 'cancelled', 'expired']);
+
+export const codeTables = pgTable('code_tables', {
+  id: serial('id').primaryKey(),
+  /** Shown as LR-XXXXX; stored without the prefix, upper case. */
+  code: text('code').notNull().unique(),
+  title: text('title'),
+  mode: text('mode').notNull(),
+  players: integer('players').notNull(),
+  entry: integer('entry').notNull().default(0),
+  /** Player IDs (LR-xxxxx) allowed to join; empty = anyone with the code. */
+  allow: jsonb('allow').$type<string[]>().notNull().default([]),
+  autoStart: boolean('auto_start').notNull().default(true),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  status: codeTableStatus('status').notNull().default('open'),
+  /** Id of the live table (T-…) while open or playing, and of the finished game. */
+  tableCode: text('table_code'),
+  createdBy: uuid('created_by').references(() => admins.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  startedAt: timestamp('started_at', { withTimezone: true }),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+  /** Final report: winner, every seat's points and chips, duration. */
+  report: jsonb('report'),
+}, (t) => [index('code_tables_status_idx').on(t.status)]);

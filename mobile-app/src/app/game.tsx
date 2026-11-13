@@ -61,7 +61,7 @@ export default function GameScreen() {
   const screen = useLayout();
   const st = useStage(screen);
   const { animations, tap, sfx } = useSettings();
-  const { table, me, config, connected, draw, discard, declare, drop, leave, chat, onEvent } = useSession();
+  const { table, notice, me, config, connected, draw, discard, declare, drop, leave, chat, onEvent } = useSession();
   const z = st.z;
   const cardW = z(66);
   const deckTL = useMemo(() => ({ x: st.x(352), y: st.y(162) }), [st.x, st.y]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -308,8 +308,8 @@ export default function GameScreen() {
   if (!table) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bgTable, alignItems: 'center', justifyContent: 'center', gap: 14 * st.k }}>
-        <ActivityIndicator color={colors.gold} />
-        <Text style={{ fontFamily: fonts.uiBold, fontSize: 14 * st.k, color: colors.textWhite }}>{connected ? 'Finding a seat…' : 'Connecting…'}</Text>
+        {notice ? null : <ActivityIndicator color={colors.gold} />}
+        <Text style={{ fontFamily: fonts.uiBold, fontSize: 14 * st.k, color: colors.textWhite, textAlign: 'center', maxWidth: 420 * st.k }}>{notice ?? (connected ? 'Finding a seat…' : 'Connecting…')}</Text>
         <GameButton s={st.k} variant="outline" label="Back to lobby" width={180} onPress={() => router.replace('/lobby')} />
       </View>
     );
@@ -321,7 +321,7 @@ export default function GameScreen() {
   const meName = me?.name ?? 'You';
   const meCode = initialsOf(meName);
   let status: string;
-  if (table.phase === 'waiting') status = table.privateCode ? `Table code ${table.privateCode} · ${table.seats.length}/${table.size} joined` : `Waiting for players · ${table.seats.length}/${table.size}`;
+  if (table.phase === 'waiting') status = table.privateCode ? `Table code ${table.official ? `LR-${table.privateCode}` : table.privateCode} · ${table.seats.length}/${table.size} joined` : `Waiting for players · ${table.seats.length}/${table.size}`;
   else if (dealing && tl && elapsed < RIFFLE_MS) status = 'Shuffling the deck…';
   else if (dealing && tl && elapsed < tl.jokerAt) status = table.size === 1 ? 'Dealing your 13 cards…' : `Dealing 13 cards to each of ${table.size} players…`;
   else if (dealing && tl && elapsed < tl.openLand + 600) status = `Wild joker is ${wildLabel}${table.wild && table.wild.rank !== 'JK' ? table.wild.suit : ''} · every ${wildLabel} is wild`;

@@ -19,7 +19,7 @@
  *   wallet    { chips }
  *   config    public game settings, sent again whenever an admin publishes
  */
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { photoPath } from '../routes/player';
 import { randomInt } from 'node:crypto';
 import type { Server, Socket } from 'socket.io';
@@ -41,8 +41,14 @@ export function liveTables() { return [...tables.values()]; }
 export function getTable(id: string) { return tables.get(id); }
 export function onlineCount() { return io ? io.of('/').sockets.size : 0; }
 
+const codeStarted = new Set<number>();
+
 const hooks = {
   onChange(t: Table) {
+    if (t.codeTableId && t.phase === 'playing' && !codeStarted.has(t.codeTableId)) {
+      codeStarted.add(t.codeTableId);
+      db.update(schema.codeTables).set({ status: 'playing', startedAt: new Date() }).where(eq(schema.codeTables.id, t.codeTableId)).catch(() => {});
+    }
     if (!io) return;
     for (const s of t.humans) if (s.playerId) io.to(playerRoom(s.playerId)).emit('table', t.view(s.idx));
   },
@@ -83,6 +89,7 @@ async function settle(t: Table, r: TableResult) {
   }).returning({ id: schema.games.id });
   const humanRows = r.seats.filter((s) => s.playerId).map((s) => ({ gameId: g.id, playerId: s.playerId!, points: s.points, chips: cancelled ? 0 : s.chips, won: s.won }));
   if (humanRows.length) await db.insert(schema.gamePlayers).values(humanRows);
+  if (t.codeTableId) await saveCodeReport(t, r, g.id).catch((e) => console.error('code table report failed', e));
   // keep the finished table around briefly so apps can show the result, then forget it
   setTimeout(() => { t.dispose(); tables.delete(t.id); }, 60_000);
 }
@@ -170,14 +177,27 @@ async function openPrivate(playerId: string, mode: ModeId, size: number, entryIn
   return t;
 }
 
+/** Friend codes are 4 digits; admin codes are 5 letters/digits, typed with or without "LR-". */
+export function normaliseCode(codeIn: string) {
+  let c = codeIn.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (c.length === 7 && c.startsWith('LR')) c = c.slice(2);
+  return c;
+}
+
 async function joinPrivate(playerId: string, codeIn: string) {
-  const code = codeIn.replace(/\D/g, '');
+  const code = normaliseCode(codeIn);
   const t = [...tables.values()].find((x) => x.privateCode === code && x.phase !== 'ended');
-  if (!t) throw new Error('No table with that code. Check the number with your friend.');
+  if (!t) throw new Error('No table with that code. Check the code and try again.');
   if (t.phase !== 'waiting') throw new Error('That game has already started.');
   if (t.isFull) throw new Error('That table is full.');
   if (getConfig().maintenance) throw new Error('Local Rummy is under maintenance. Please try again soon.');
   const p = await loadPlayer(playerId);
+  if (t.codeTableId) {
+    const row = await db.query.codeTables.findFirst({ where: eq(schema.codeTables.id, t.codeTableId) });
+    if (!row || row.status !== 'open') throw new Error('This table is closed.');
+    if (row.expiresAt.getTime() < Date.now()) throw new Error('This code has expired.');
+    if (row.allow.length && !row.allow.includes(p.code)) throw new Error('This table is for invited players only.');
+  }
   await sitDown(p, t, false);
   return t;
 }
@@ -187,7 +207,7 @@ async function leaveWaiting(playerId: string, t: Table) {
   playerTable.delete(playerId);
   if (s?.escrow) { await moveChips(playerId, s.escrow, 'refund', { tableCode: t.id, note: 'Left before the deal' }); await pushWallet(playerId); }
   const left = t.seats.filter((x) => x.kind === 'human');
-  if (!left.length) { t.dispose(); tables.delete(t.id); return; }
+  if (!left.length && !t.codeTableId) { t.dispose(); tables.delete(t.id); return; }
   // the host left a private table: the next friend becomes host
   if (t.hostId === playerId) t.hostId = left[0].playerId ?? null;
   hooks.onChange(t);
@@ -364,6 +384,112 @@ export function kickPlayer(playerId: string) {
   if (t?.phase === 'playing') { const s = t.seatOf(playerId); if (s) t.drop(s.idx); }
   else if (t?.phase === 'waiting') leaveWaiting(playerId, t).catch(() => {});
   io?.in(playerRoom(playerId)).disconnectSockets(true);
+}
+
+// ---------------------------------------------------------------- admin code tables
+
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O, 1/I/L
+const expiryTimers = new Map<number, NodeJS.Timeout>();
+
+export function newTableCode() {
+  const used = new Set([...tables.values()].map((x) => x.privateCode));
+  let c = '';
+  do c = Array.from({ length: 5 }, () => CODE_ALPHABET[randomInt(0, CODE_ALPHABET.length)]).join(''); while (used.has(c));
+  return c;
+}
+
+type CodeRow = typeof schema.codeTables.$inferSelect;
+
+/** Opens the live table for a code table row and schedules its expiry. */
+export function openCodeTable(row: CodeRow): Table {
+  const t = new Table(row.mode as ModeId, row.players, row.entry, getConfig(), hooks);
+  t.privateCode = row.code;
+  t.codeTableId = row.id;
+  t.holdStart = !row.autoStart;
+  tables.set(t.id, t);
+  db.update(schema.codeTables).set({ tableCode: t.id }).where(eq(schema.codeTables.id, row.id)).catch(() => {});
+  const ms = Math.min(row.expiresAt.getTime() - Date.now(), 2 ** 31 - 1);
+  expiryTimers.set(row.id, setTimeout(() => { expireCodeTable(row.id).catch(() => {}); }, Math.max(0, ms)));
+  return t;
+}
+
+export function codeTableLive(id: number) {
+  return [...tables.values()].find((x) => x.codeTableId === id);
+}
+
+/** Sends a player back to the lobby with a message (removed, cancelled or expired). */
+function sendHome(playerId: string, message: string) {
+  io?.to(playerRoom(playerId)).emit('removed', { message });
+}
+
+async function closeWaiting(t: Table, message: string) {
+  for (const s of [...t.humans]) if (s.playerId) { await leaveWaiting(s.playerId, t).catch(() => {}); sendHome(s.playerId, message); }
+  t.dispose(); tables.delete(t.id);
+}
+
+async function expireCodeTable(id: number) {
+  expiryTimers.delete(id);
+  const t = codeTableLive(id);
+  if (t && t.phase !== 'waiting') return; // already playing: it finishes normally
+  if (t) await closeWaiting(t, 'This table’s code expired before the game started. Your entry was refunded.');
+  await db.update(schema.codeTables).set({ status: 'expired', endedAt: new Date() }).where(and(eq(schema.codeTables.id, id), eq(schema.codeTables.status, 'open')));
+}
+
+export function startCodeTable(id: number): string | null {
+  const t = codeTableLive(id);
+  if (!t) return 'This table is not open.';
+  const err = t.startNow(false);
+  if (!err) hooks.onChange(t);
+  return err;
+}
+
+export async function removeFromCodeTable(id: number, playerId: string): Promise<string | null> {
+  const t = codeTableLive(id);
+  if (!t || t.phase !== 'waiting') return 'Players can only be removed before the game starts.';
+  if (!t.seatOf(playerId)) return 'That player is not at this table.';
+  await leaveWaiting(playerId, t);
+  sendHome(playerId, 'The organiser removed you from this table. Your entry was refunded.');
+  return null;
+}
+
+export async function cancelCodeTable(id: number): Promise<string | null> {
+  const row = await db.query.codeTables.findFirst({ where: eq(schema.codeTables.id, id) });
+  if (!row || (row.status !== 'open' && row.status !== 'playing')) return 'This table has already ended.';
+  const t = codeTableLive(id);
+  clearTimeout(expiryTimers.get(id)); expiryTimers.delete(id);
+  if (t?.phase === 'playing') { t.cancel(); return null; } // settle() writes the report and refunds
+  if (t) await closeWaiting(t, 'The organiser cancelled this table. Your entry was refunded.');
+  await db.update(schema.codeTables).set({ status: 'cancelled', endedAt: new Date() }).where(eq(schema.codeTables.id, id));
+  return null;
+}
+
+async function saveCodeReport(t: Table, r: TableResult, gameId: number) {
+  const ids = r.seats.map((s) => s.playerId).filter((x): x is string => !!x);
+  const ps = ids.length ? await db.query.players.findMany({ where: inArray(schema.players.id, ids), columns: { id: true, code: true } }) : [];
+  const codeOf = new Map(ps.map((p) => [p.id, p.code]));
+  const started = t.startedAt || t.createdAt;
+  const report = {
+    gameId,
+    reason: r.reason,
+    winner: r.seats.find((s) => s.won)?.name ?? null,
+    durationSec: Math.round((Date.now() - started) / 1000),
+    seats: r.seats.map((s) => ({ name: s.name, playerId: s.playerId ?? null, playerCode: s.playerId ? codeOf.get(s.playerId) ?? null : null, bot: s.kind === 'bot', points: s.points, chips: r.reason === 'cancelled' ? 0 : s.chips, won: s.won, status: s.status })),
+  };
+  clearTimeout(expiryTimers.get(t.codeTableId!)); expiryTimers.delete(t.codeTableId!);
+  codeStarted.delete(t.codeTableId!);
+  await db.update(schema.codeTables).set({ status: r.reason === 'cancelled' ? 'cancelled' : 'finished', endedAt: new Date(), report }).where(eq(schema.codeTables.id, t.codeTableId!));
+}
+
+/** On start-up: reopen code tables still waiting for players; close the rest. */
+export async function restoreCodeTables() {
+  const rows = await db.query.codeTables.findMany({ where: inArray(schema.codeTables.status, ['open', 'playing']) });
+  for (const row of rows) {
+    if (row.status === 'playing') {
+      await db.update(schema.codeTables).set({ status: 'cancelled', endedAt: new Date(), report: { reason: 'restart', note: 'The server restarted during the game. Entries were refunded.' } }).where(eq(schema.codeTables.id, row.id));
+    } else if (row.expiresAt.getTime() <= Date.now()) {
+      await db.update(schema.codeTables).set({ status: 'expired', endedAt: new Date() }).where(eq(schema.codeTables.id, row.id));
+    } else openCodeTable(row);
+  }
 }
 
 export { pushWallet };

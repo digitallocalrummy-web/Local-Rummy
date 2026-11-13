@@ -45,6 +45,8 @@ export interface TableView {
   id: string; mode: ModeId; size: number; entry: number; phase: 'waiting' | 'playing' | 'ended'; you: number;
   /** Play with Friends: the code to share, and which seat is the host (-1 for public tables). */
   privateCode: string | null; host: number;
+  /** Admin code table: shown as an official table; autoStart false = the organiser presses Start. */
+  official?: boolean; autoStart?: boolean;
   hand: Card[]; canDraw: boolean; canDiscard: boolean; seats: SeatView[];
   open: { card: Card; by: number } | null; recent: { card: Card; by: number }[]; deckCount: number;
   wild: Card | null; wildRank: string | null; turn: number; deadline: number | null; result: TableResult | null;
@@ -66,6 +68,8 @@ interface SessionValue {
   banners: Banner[];
   connected: boolean;
   table: TableView | null;
+  /** Why we were sent away from a table (removed, cancelled, expired), until the next table. */
+  notice: string | null;
   /** The last finished deal, kept for the result screen. */
   lastResult: { result: TableResult; table: TableView } | null;
   retry: () => void;
@@ -115,6 +119,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [config, setConfig] = useState<PublicConfig | null>(null);
   const [banners, setBanners] = useState<Banner[]>([]);
   const [connected, setConnected] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [table, setTable] = useState<TableView | null>(null);
   const [lastResult, setLastResult] = useState<SessionValue['lastResult']>(null);
   const token = useRef<string | null>(null);
@@ -164,7 +169,9 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         s.on('connect_error', () => setConnected(false));
         s.on('config', (c: PublicConfig) => setConfig(c));
         s.on('wallet', (w: { chips: number }) => setMe((m) => (m ? { ...m, chips: w.chips } : m)));
-        s.on('table', (v: TableView) => { tableRef.current = v; setTable(v); });
+        s.on('table', (v: TableView) => { tableRef.current = v; setTable(v); setNotice(null); });
+        // the organiser removed us, or cancelled / expired the table before it started
+        s.on('removed', (m: { message: string }) => { tableRef.current = null; setTable(null); setNotice(m.message); });
         s.on('event', (e: TableEvent) => {
           if (e.type === 'ended' && tableRef.current) setLastResult({ result: e.result, table: tableRef.current });
           listeners.current.forEach((fn) => fn(e));
@@ -190,7 +197,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const refreshMe = useCallback(async () => { setMe(await call<Me>('/api/me')); }, [call]);
 
   const value = useMemo<SessionValue>(() => ({
-    status, error, me, config, banners, connected, table, lastResult,
+    status, error, me, config, banners, connected, table, notice, lastResult,
     retry: () => setAttempt((a) => a + 1),
     refreshMe,
     claimBonus: async () => {
@@ -230,7 +237,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     onEvent: (fn) => { listeners.current.add(fn); return () => { listeners.current.delete(fn); }; },
     sendTicket: async (t) => { await call('/api/tickets', { body: t }); },
     tickets: () => call<any[]>('/api/tickets'),
-  }), [status, error, me, config, banners, connected, table, lastResult, call, emit, refreshMe]);
+  }), [status, error, me, config, banners, connected, table, notice, lastResult, call, emit, refreshMe]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

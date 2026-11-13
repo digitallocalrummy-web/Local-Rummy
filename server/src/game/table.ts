@@ -21,6 +21,8 @@ export interface Seat {
   /** Emoji avatar, or a photo path (/api/avatars/…); null shows initials. */
   avatar?: string | null;
   photo?: string | null;
+  /** When a person sat down (ms). */
+  joinedAt?: number;
   hand: Card[];
   status: SeatStatus;
   drawn: boolean;
@@ -87,6 +89,10 @@ export class Table {
   privateCode: string | null = null;
   /** Player who created a private table; only they can start it. */
   hostId: string | null = null;
+  /** Set for admin code tables (code_tables.id). */
+  codeTableId: number | null = null;
+  /** Admin code tables with auto-start off: wait for the admin even when every seat is filled. */
+  holdStart = false;
   private timers = new Set<NodeJS.Timeout>();
   private turnTimer: NodeJS.Timeout | null = null;
 
@@ -108,10 +114,10 @@ export class Table {
 
   addHuman(p: { id: string; name: string; code: string; color: string; avatar?: string | null; photo?: string | null }, escrow: number): Seat {
     if (this.phase !== 'waiting' || this.isFull) throw new Error('Table is not open');
-    const seat: Seat = { idx: this.seats.length, kind: 'human', playerId: p.id, name: p.name, code: p.code, color: p.color, avatar: p.avatar ?? null, photo: p.photo ?? null, hand: [], status: 'playing', drawn: false, missed: 0, moves: 0, connected: true, escrow };
+    const seat: Seat = { idx: this.seats.length, kind: 'human', playerId: p.id, name: p.name, code: p.code, color: p.color, avatar: p.avatar ?? null, photo: p.photo ?? null, joinedAt: Date.now(), hand: [], status: 'playing', drawn: false, missed: 0, moves: 0, connected: true, escrow };
     this.seats.push(seat);
     this.touch();
-    if (this.isFull) this.start();
+    if (this.isFull && !this.holdStart) this.start();
     return seat;
   }
 
@@ -143,7 +149,7 @@ export class Table {
   startNow(fillAi: boolean): string | null {
     if (this.phase !== 'waiting') return 'The game has already started.';
     if (fillAi) { this.fillWithBots(); return null; }
-    if (this.seats.length < 2) return 'Wait for at least one friend, or start with AI players.';
+    if (this.seats.length < 2) return this.codeTableId ? 'At least 2 players must join before the game can start.' : 'Wait for at least one friend, or start with AI players.';
     this.size = this.seats.length;
     this.start();
     return null;
@@ -382,6 +388,9 @@ export class Table {
       mode: this.mode,
       size: this.size,
       privateCode: this.privateCode,
+      /** Admin code table: shows as an official table; autoStart tells players what to expect. */
+      official: this.codeTableId != null,
+      autoStart: !this.holdStart,
       host: this.hostId ? this.seats.findIndex((x) => x.playerId === this.hostId) : -1,
       entry: this.entry,
       phase: this.phase,
@@ -414,7 +423,8 @@ export class Table {
       startedAt: this.startedAt || null, createdAt: this.createdAt, lastActionAt: this.lastActionAt,
       turnCount: this.turnCount, deckCount: this.deck.length, open: this.pile[this.pile.length - 1]?.card ?? null,
       wild: this.wild, turn: this.turn,
-      seats: this.seats.map((s) => ({ idx: s.idx, name: s.name, code: s.code, color: s.color, isBot: s.kind === 'bot', playerId: s.playerId ?? null, cards: s.hand.length, status: s.status, connected: s.connected, points: s.status === 'playing' ? arrange(s.hand.slice(0, 13), this.wildRank, 4000).points : s.dropPoints ?? null })),
+      codeTableId: this.codeTableId,
+      seats: this.seats.map((s) => ({ idx: s.idx, name: s.name, code: s.code, color: s.color, avatar: s.avatar ?? null, photo: s.photo ?? null, isBot: s.kind === 'bot', playerId: s.playerId ?? null, joinedAt: s.joinedAt ?? null, cards: s.hand.length, status: s.status, connected: s.connected, points: s.status === 'playing' ? arrange(s.hand.slice(0, 13), this.wildRank, 4000).points : s.dropPoints ?? null })),
     };
   }
 

@@ -1,6 +1,7 @@
 import { Share2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { ActivityIndicator, Share, Text, View } from 'react-native';
+import { Crown } from '../components/Decor';
 import { GameButton } from '../components/GameButton';
 import { PlayerAvatar } from '../components/PlayerAvatar';
 import { MODE_LABEL } from '../components/TableSetup';
@@ -28,12 +29,14 @@ export function WaitingRoom({ table, rect, s }: { table: TableView; rect: Rect; 
     );
   }
 
-  const isHost = table.host === table.you;
+  const official = !!table.official;
+  const shown = official ? `LR-${table.privateCode}` : table.privateCode;
+  const isHost = !official && table.host === table.you;
   const hostName = table.seats[table.host]?.name ?? 'The host';
   const humans = table.seats.length;
   const share = () => {
     tap();
-    Share.share({ message: `Join my Local Rummy table! Open the app → Play with Friends → enter code ${table.privateCode}` }).catch(() => {});
+    Share.share({ message: `Join my Local Rummy table! Open the app → Play with Friends → enter code ${shown}` }).catch(() => {});
   };
   const start = async (fillAi: boolean) => {
     setBusy(true); setError(null);
@@ -45,16 +48,22 @@ export function WaitingRoom({ table, rect, s }: { table: TableView; rect: Rect; 
 
   return (
     <View style={[box, { backgroundColor: 'rgba(6,30,18,0.92)', borderRadius: 24 * s, gap: 8 * s, paddingHorizontal: 20 * s }]}>
+      {official && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 * s, paddingHorizontal: 10 * s, paddingVertical: 3 * s, borderRadius: 12 * s, backgroundColor: 'rgba(232,198,106,0.16)', borderWidth: 1, borderColor: colors.gold }}>
+          <Crown width={14 * s} />
+          <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 10 * s, letterSpacing: 1.4, color: colors.goldBright }}>OFFICIAL TABLE</Text>
+        </View>
+      )}
       <Text style={{ fontFamily: fonts.uiHeavy, fontSize: 11 * s, letterSpacing: 1.6, color: '#CFE3D6' }}>
-        TABLE WITH FRIENDS · {MODE_LABEL[table.mode]} · {table.entry ? `ENTRY ${table.entry}` : 'FREE'}
+        {official ? 'CODE TABLE' : 'TABLE WITH FRIENDS'} · {MODE_LABEL[table.mode]} · {table.entry ? `ENTRY ${table.entry}` : 'FREE'}
       </Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 * s }}>
-        <Text accessibilityLabel={`Table code ${table.privateCode.split('').join(' ')}`}
-          style={{ fontFamily: fonts.display, fontSize: 44 * s, letterSpacing: 10 * s, color: colors.goldBright }}>{table.privateCode}</Text>
+        <Text accessibilityLabel={`Table code ${shown.split('').join(' ')}`}
+          style={{ fontFamily: fonts.display, fontSize: (official ? 34 : 44) * s, letterSpacing: (official ? 5 : 10) * s, color: colors.goldBright }}>{shown}</Text>
         <GameButton s={s} variant="outline" height={40} label="Share" onPress={share} icon={<Share2 size={16 * s} color={colors.gold} />} />
       </View>
       <Text style={{ fontFamily: fonts.ui, fontSize: 12 * s, color: colors.text }}>
-        Friends open Play with Friends and enter this code · {humans} of {table.size} joined
+        {official ? 'Players join with this code in Play with Friends' : 'Friends open Play with Friends and enter this code'} · {humans} of {table.size} joined
       </Text>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 10 * s, marginVertical: 4 * s }}>
         {table.seats.map((p) => (
@@ -80,7 +89,9 @@ export function WaitingRoom({ table, rect, s }: { table: TableView; rect: Rect; 
       ) : (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 * s }}>
           <ActivityIndicator color={colors.gold} size="small" />
-          <Text style={{ fontFamily: fonts.uiBold, fontSize: 12 * s, color: colors.textMuted }}>Waiting for {hostName} to start the game</Text>
+          <Text style={{ fontFamily: fonts.uiBold, fontSize: 12 * s, color: colors.textMuted }}>
+            {official ? (table.autoStart ? `Starts automatically when all ${table.size} seats are filled` : 'Waiting for the organiser to start the game') : `Waiting for ${hostName} to start the game`}
+          </Text>
         </View>
       )}
     </View>

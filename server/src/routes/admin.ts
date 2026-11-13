@@ -7,7 +7,7 @@ import { requireAdmin, signAdmin } from '../auth';
 import { configSchema, getConfig, getConfigMeta, saveConfig } from '../config';
 import { db, schema } from '../db';
 import { photoPath } from './player';
-import { cancelTable, kickPlayer, liveTables, messageTable, onlineCount, pushWallet, skipTurn } from '../game/manager';
+import { cancelCodeTable, cancelTable, codeTableLive, kickPlayer, liveTables, messageTable, newTableCode, onlineCount, openCodeTable, pushWallet, removeFromCodeTable, skipTurn, startCodeTable } from '../game/manager';
 import { sendPush } from '../push';
 import { InsufficientChips, moveChips } from '../wallet';
 import { bonusState, istDay } from './player';
@@ -154,6 +154,94 @@ export async function adminRoutes(app: FastifyInstance) {
     });
     r.post('/api/admin/tables/:id/cancel', canEdit, async (req, reply) => (cancelTable((req.params as { id: string }).id) ? { ok: true } : reply.code(404).send({ error: 'Table not running.' })));
     r.post('/api/admin/tables/:id/skip', canEdit, async (req, reply) => (skipTurn((req.params as { id: string }).id) ? { ok: true } : reply.code(404).send({ error: 'Table not running.' })));
+    // ---------------------------------------------------------------- code tables
+    const codeView = (row: typeof schema.codeTables.$inferSelect) => {
+      const t = codeTableLive(row.id);
+      return {
+        ...row, displayCode: `LR-${row.code}`,
+        seated: t ? t.humans.length : 0,
+        live: t ? { id: t.id, phase: t.phase } : null,
+      };
+    };
+
+    r.get('/api/admin/code-tables', async (req) => {
+      const q = req.query as { status?: string };
+      const where = q.status === 'active' ? inArray(schema.codeTables.status, ['open', 'playing'])
+        : q.status === 'ended' ? inArray(schema.codeTables.status, ['finished', 'cancelled', 'expired']) : undefined;
+      const rows = await db.select().from(schema.codeTables).where(where).orderBy(desc(schema.codeTables.createdAt)).limit(200);
+      return { rows: rows.map(codeView) };
+    });
+
+    r.get('/api/admin/code-tables/:id', async (req, reply) => {
+      const id = Number((req.params as { id: string }).id);
+      const row = await db.query.codeTables.findFirst({ where: eq(schema.codeTables.id, id) });
+      if (!row) return reply.code(404).send({ error: 'Code table not found.' });
+      const t = codeTableLive(id);
+      const ids = t ? t.humans.map((s) => s.playerId!).filter(Boolean) : [];
+      const ps = ids.length ? await db.query.players.findMany({ where: inArray(schema.players.id, ids) }) : [];
+      const byId = new Map(ps.map((p) => [p.id, p]));
+      const joined = t ? t.humans.map((s) => {
+        const p = byId.get(s.playerId!);
+        return {
+          playerId: s.playerId, name: s.name, code: p?.code ?? null, color: s.color, avatar: p?.avatar ?? null, photoUrl: p ? photoPath(p) : null,
+          chips: p?.chips ?? 0, phone: p?.phone ?? null, device: p?.device ?? null, appVersion: p?.appVersion ?? null,
+          joinedAt: s.joinedAt ?? null, connected: s.connected,
+        };
+      }) : [];
+      const creator = row.createdBy ? await db.query.admins.findFirst({ where: eq(schema.admins.id, row.createdBy), columns: { name: true } }) : null;
+      return { ...codeView(row), createdByName: creator?.name ?? null, joined, table: t && t.phase !== 'waiting' ? t.adminView() : null };
+    });
+
+    r.post('/api/admin/code-tables', canEdit, async (req, reply) => {
+      const body = z.object({
+        title: z.string().trim().max(60).optional(),
+        mode: z.enum(['points', 'pool', 'deals']),
+        players: z.number().int().min(2).max(10),
+        entry: z.number().int().min(0),
+        allow: z.array(z.string().trim().toUpperCase()).max(10).default([]),
+        autoStart: z.boolean().default(true),
+        expiresInMinutes: z.number().int().min(5).max(7 * 24 * 60).optional(),
+        expiresAt: z.string().datetime({ offset: true }).optional(),
+      }).safeParse(req.body);
+      if (!body.success) return reply.code(400).send({ error: 'Check the table details.' });
+      const b = body.data;
+      const m = getConfig().modes[b.mode];
+      if (!m) return reply.code(400).send({ error: 'Unknown game.' });
+      if (b.players > m.maxPlayers) return reply.code(400).send({ error: `This game allows up to ${m.maxPlayers} players.` });
+      if (b.entry !== 0 && !m.entries.includes(b.entry)) return reply.code(400).send({ error: 'Pick one of the entry amounts in Game setup, or free.' });
+      // allow list: player IDs like LR-12345, checked against real players
+      const allow = [...new Set(b.allow.map((c) => (c.startsWith('LR-') ? c : `LR-${c}`)))];
+      if (allow.length) {
+        const found = await db.query.players.findMany({ where: inArray(schema.players.code, allow), columns: { code: true } });
+        const missing = allow.filter((c) => !found.some((f) => f.code === c));
+        if (missing.length) return reply.code(400).send({ error: `No player with ID ${missing.join(', ')}.` });
+        if (allow.length < 2) return reply.code(400).send({ error: 'Invite at least 2 players, or leave the list empty for anyone with the code.' });
+      }
+      const expiresAt = b.expiresAt ? new Date(b.expiresAt) : new Date(Date.now() + (b.expiresInMinutes ?? 60) * 60_000);
+      if (expiresAt.getTime() < Date.now() + 60_000) return reply.code(400).send({ error: 'Choose an expiry time in the future.' });
+      if (expiresAt.getTime() > Date.now() + 7 * 24 * 3600_000) return reply.code(400).send({ error: 'Codes can last at most 7 days.' });
+      const [row] = await db.insert(schema.codeTables).values({
+        code: newTableCode(), title: b.title || null, mode: b.mode, players: b.players, entry: b.entry,
+        allow, autoStart: b.autoStart, expiresAt, createdBy: req.admin!.sub,
+      }).returning();
+      openCodeTable(row);
+      return codeView(row);
+    });
+
+    r.post('/api/admin/code-tables/:id/start', canEdit, async (req, reply) => {
+      const err = startCodeTable(Number((req.params as { id: string }).id));
+      return err ? reply.code(400).send({ error: err }) : { ok: true };
+    });
+    r.post('/api/admin/code-tables/:id/remove', canEdit, async (req, reply) => {
+      const { playerId } = (req.body ?? {}) as { playerId?: string };
+      const err = await removeFromCodeTable(Number((req.params as { id: string }).id), String(playerId ?? ''));
+      return err ? reply.code(400).send({ error: err }) : { ok: true };
+    });
+    r.post('/api/admin/code-tables/:id/cancel', canEdit, async (req, reply) => {
+      const err = await cancelCodeTable(Number((req.params as { id: string }).id));
+      return err ? reply.code(400).send({ error: err }) : { ok: true };
+    });
+
     r.post('/api/admin/tables/:id/message', async (req, reply) => {
       const { text } = z.object({ text: z.string().trim().min(1).max(120) }).parse(req.body);
       return messageTable((req.params as { id: string }).id, text) ? { ok: true } : reply.code(404).send({ error: 'Table not running.' });

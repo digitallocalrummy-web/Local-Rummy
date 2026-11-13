@@ -3,13 +3,14 @@ import { buildApp } from './app';
 import { loadConfig } from './config';
 import { closeDb } from './db';
 import { env } from './env';
-import { attachSockets, refundOrphanedEntries } from './game/manager';
+import { attachSockets, refundOrphanedEntries, restoreCodeTables } from './game/manager';
 import { runMigrations } from './migrate';
 
 async function main() {
   await runMigrations();
   await loadConfig();
   await refundOrphanedEntries();
+  await restoreCodeTables();
   const app = await buildApp();
   const io = new Server(app.server, { cors: { origin: true }, pingInterval: 10_000, pingTimeout: 8_000 });
   attachSockets(io);

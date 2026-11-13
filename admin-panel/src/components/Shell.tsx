@@ -11,6 +11,7 @@ export const ICONS = {
   support: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
   games: 'M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6',
   live: 'M22 12h-4l-3 9L9 3l-3 9H2',
+  code: 'M7 11V7a5 5 0 0 1 10 0v4M5 11h14v10H5zM12 15v2',
   chips: 'M12 3c4.4 0 8 1.3 8 3s-3.6 3-8 3-8-1.3-8-3 3.6-3 8-3M4 6v6c0 1.7 3.6 3 8 3s8-1.3 8-3V6M4 12v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6',
   reports: 'M3 3v18h18M8 17v-6M13 17V7M18 17v-4',
   content: 'M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0',
@@ -21,7 +22,7 @@ export const ICONS = {
 const NAV: { group: string; items: { to: string; label: string; icon: keyof typeof ICONS; badge?: 'support' }[] }[] = [
   { group: 'Dashboard', items: [{ to: '/', label: 'Overview', icon: 'overview' }] },
   { group: 'Players', items: [{ to: '/players', label: 'Players', icon: 'players' }, { to: '/support', label: 'Support & reports', icon: 'support', badge: 'support' }] },
-  { group: 'Game', items: [{ to: '/games', label: 'Game setup', icon: 'games' }, { to: '/tables', label: 'Live tables', icon: 'live' }, { to: '/chips', label: 'Chips & rewards', icon: 'chips' }] },
+  { group: 'Game', items: [{ to: '/games', label: 'Game setup', icon: 'games' }, { to: '/tables', label: 'Live tables', icon: 'live' }, { to: '/code-tables', label: 'Code tables', icon: 'code' }, { to: '/chips', label: 'Chips & rewards', icon: 'chips' }] },
   { group: 'Growth', items: [{ to: '/reports', label: 'Reports', icon: 'reports' }, { to: '/content', label: 'Banners & push', icon: 'content' }] },
   { group: 'Account', items: [{ to: '/settings', label: 'Settings', icon: 'settings' }] },
 ];

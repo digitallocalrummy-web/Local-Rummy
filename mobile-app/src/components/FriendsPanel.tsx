@@ -33,7 +33,7 @@ export function FriendsPanel({ s, onCreate }: { s: number; onCreate: (mode: Mode
   }
 
   const join = async () => {
-    if (code.length !== 4) { setError('Table codes have 4 digits.'); return; }
+    if (code.replace(/^LR-?/, '').length < 4) { setError('Enter the table code, like 4821 or LR-7K4QX.'); return; }
     setBusy(true); setError(null);
     const r = await joinPrivate(code);
     setBusy(false);
@@ -78,15 +78,16 @@ export function FriendsPanel({ s, onCreate }: { s: number; onCreate: (mode: Mode
             <TextInput
               accessibilityLabel="Table code"
               value={code}
-              onChangeText={(t) => { setCode(t.replace(/\D/g, '').slice(0, 4)); setError(null); }}
-              keyboardType="number-pad"
-              maxLength={4}
-              placeholder="0000"
+              onChangeText={(t) => { setCode(t.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 8)); setError(null); }}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={8}
+              placeholder="LR-7K4QX"
               placeholderTextColor="#6B7380"
               onSubmitEditing={join}
-              style={{ flex: 1, width: 0, minWidth: 0, height: z(38), minHeight: 40, borderRadius: z(10), borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.14)', backgroundColor: 'rgba(0,0,0,0.3)', color: colors.goldBright, fontFamily: fonts.uiHeavy, fontSize: z(14), letterSpacing: z(6), paddingHorizontal: z(12) }}
+              style={{ flex: 1, width: 0, minWidth: 0, height: z(38), minHeight: 40, borderRadius: z(10), borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.14)', backgroundColor: 'rgba(0,0,0,0.3)', color: colors.goldBright, fontFamily: fonts.uiHeavy, fontSize: z(14), letterSpacing: z(3), paddingHorizontal: z(12) }}
             />
-            <Pill z={z} line h={38} label="JOIN" fs={14} busy={busy} disabled={code.length !== 4} onPress={join} style={{ width: z(70) }} />
+            <Pill z={z} line h={38} label="JOIN" fs={14} busy={busy} disabled={code.replace(/^LR-?/, '').length < 4} onPress={join} style={{ width: z(70) }} />
           </View>
           {error && <Text style={{ fontFamily: fonts.uiBold, fontSize: z(11), color: colors.loss }}>{error}</Text>}
         </View>
