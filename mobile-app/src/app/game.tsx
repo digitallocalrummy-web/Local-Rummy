@@ -13,7 +13,7 @@ import {
   Banner, Deck, Felt, FlyCard, Me, OpenPile, OpponentSeat, Riffle, RightRail, SEAT_LAYOUTS, Tray, useStage, type Flight,
 } from '../game/Stage';
 import { WaitingRoom } from '../game/WaitingRoom';
-import { groupInfo, pointsLeft, smartGroups, type GroupKind } from '../game/hand';
+import { declareAdvice, groupInfo, pointsLeft, smartGroups, type GroupKind } from '../game/hand';
 import { useLayout } from '../hooks/useLayout';
 import { initialsOf, useSession, type SeatView, type TableEvent, photoUri } from '../net/session';
 import { useSettings } from '../state/settings';
@@ -62,7 +62,8 @@ const GROUP_TONE: Record<GroupKind, { bg: string; fg: string }> = {
 };
 
 function seatStatus(seat: SeatView, active: boolean) {
-  if (!seat.connected) return 'OFFLINE';
+  // lost connection: their seat is held for a while, then the game plays for them
+  if (!seat.connected) return seat.reconnectUntil && seat.reconnectUntil > Date.now() ? 'RECONNECTING…' : 'AWAY · AUTO-PLAY';
   if (seat.status === 'dropped') return 'DROPPED';
   if (seat.status === 'invalid') return 'WRONG SHOW';
   if (active) return 'THINKING…';
@@ -260,6 +261,17 @@ export default function GameScreen() {
     // hand order doesn't change the points; only which cards you hold
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handKey, wildRank]);
+  // declare hint: would these cards make a valid show? (worked out just after the cards settle)
+  const [declareHint, setDeclareHint] = useState<{ ok: boolean; text: string } | null>(null);
+  const selKey = selected.join(',');
+  const canShow = !!table?.canDiscard && hand.length === 14;
+  useEffect(() => {
+    const t = setTimeout(() => setDeclareHint(canShow ? declareAdvice(hand, selected, wildRank) : null), 80);
+    return () => clearTimeout(t);
+    // depends on which cards you hold and which one is selected, not their order
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [handKey, selKey, wildRank, canShow]);
+
   const groupLabels = useMemo(() => {
     if (!liveGroups || !groupOf) return [];
     let i = 0;
@@ -491,6 +503,7 @@ export default function GameScreen() {
         points={myPoints == null || dealing || hand.length < 13 ? '–' : String(myPoints)}
         canDiscard={canDiscard}
         canDeclare={!!table.canDiscard && !busy}
+        declareHint={declareHint}
         onEmote={() => setEmoteOpen(true)}
         onLeave={() => setLeaveOpen(true)}
         onSort={() => { tap(); setGroups(null); setOrder(sortCards(hand).map((c) => c.id)); }}
@@ -522,7 +535,7 @@ export default function GameScreen() {
       <AnimatedModal visible={declareOpen} title="DECLARE HAND?" onClose={() => setDeclareOpen(false)} width={460}>
         <Text style={{ fontFamily: fonts.ui, fontSize: 13 * st.k, lineHeight: 19 * st.k, color: colors.text, marginBottom: 16 * st.k }}>
           {selected.length === 1
-            ? `You will throw ${label(hand.find((c) => c.id === selected[0]) ?? hand[0])} and show your other 13 cards. The server checks them: you need two sequences, one of them pure. A wrong show costs 80 points.`
+            ? `You will throw ${label(hand.find((c) => c.id === selected[0]) ?? hand[0])} and show your other 13 cards. ${declareHint?.ok ? 'Your cards look valid.' : `Careful: ${declareHint?.text ?? 'they may not be valid.'}`} A wrong show costs 80 points.`
             : 'First select the one card you want to throw. Your other 13 cards are then checked.'}
         </Text>
         <View style={{ flexDirection: 'row', gap: 12 * st.k }}>

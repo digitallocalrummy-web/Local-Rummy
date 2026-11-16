@@ -310,8 +310,10 @@ const IconBtn = ({ st, x, label, onPress, children }: { st: Stage; x: number; la
   </At>
 );
 
-export function RightRail({ st, modeName, info, pointsLabel, points, canDiscard, canDeclare, onEmote, onLeave, onSort, onGroup, onDiscard, onDeclare }: {
+export function RightRail({ st, modeName, info, pointsLabel, points, canDiscard, canDeclare, declareHint, onEmote, onLeave, onSort, onGroup, onDiscard, onDeclare }: {
   st: Stage; modeName: string; info: string; pointsLabel: string; points: string; canDiscard: boolean; canDeclare: boolean;
+  /** Before you declare: whether your cards would make a valid show, and why not. */
+  declareHint?: { ok: boolean; text: string } | null;
   onEmote: () => void; onLeave: () => void; onSort: () => void; onGroup: () => void; onDiscard: () => void; onDeclare: () => void;
 }) {
   const z = st.z;
@@ -346,6 +348,14 @@ export function RightRail({ st, modeName, info, pointsLabel, points, canDiscard,
         <Text style={{ fontFamily: fonts.uiHeavy, fontSize: z(9), letterSpacing: z(0.8), color: colors.gold }}>{pointsLabel}</Text>
         <Text style={{ fontFamily: fonts.display, fontSize: z(16), color: '#fff' }}>{points}<Text style={{ fontFamily: fonts.ui, fontSize: z(12), color: MUTE }}>/80</Text></Text>
       </At>
+      {declareHint && (
+        <At st={st} x={836} y={192} w={110} pointerEvents="none" style={{ paddingHorizontal: z(8), paddingVertical: z(6), borderRadius: z(10), borderWidth: 1.5, borderColor: declareHint.ok ? '#3FCB7E' : 'rgba(255,140,140,0.7)', backgroundColor: declareHint.ok ? 'rgba(20,90,50,0.92)' : 'rgba(70,14,18,0.88)', gap: z(2) }}>
+          <View accessible accessibilityLiveRegion="polite" accessibilityLabel={`${declareHint.ok ? 'Ready to declare' : 'Not ready to declare'}: ${declareHint.text}`}>
+            <Text style={{ fontFamily: fonts.uiHeavy, fontSize: z(9), letterSpacing: z(0.6), color: declareHint.ok ? '#9BF2C0' : '#FFB4B4' }}>{declareHint.ok ? '✓ READY TO DECLARE' : '✗ NOT READY'}</Text>
+            <Text numberOfLines={3} style={{ fontFamily: fonts.uiBold, fontSize: z(8.5), lineHeight: z(11), color: '#F1F4EF' }}>{declareHint.text}</Text>
+          </View>
+        </At>
+      )}
       <At st={st} x={836} y={262} w={110} style={{ gap: z(8) }}>
         <View style={{ flexDirection: 'row', gap: z(8) }}>
           {tile('SORT', <ArrowDownUp size={z(16)} color={colors.gold} />, onSort)}

@@ -9,7 +9,7 @@ export type Config = {
   modes: Record<'points' | 'pool' | 'deals', { enabled: boolean; maxPlayers: number; entries: number[] }>;
   turnSeconds: number; autoDropAfter: number; drops: { first: number; middle: number; full: number };
   printedJokers: boolean; quickChat: boolean; maintenance: boolean; minAppVersion: string;
-  bonus: { day1: number; multipliers: number[] }; refill: number; welcome: number; botFillSeconds: number; friendsTables: boolean;
+  bonus: { day1: number; multipliers: number[] }; refill: number; welcome: number; botFillSeconds: number; friendsTables: boolean; reconnectGraceSeconds?: number;
 };
 
 const MODES = [
@@ -122,6 +122,7 @@ export default function GameSetup() {
               <NumIn id="d3" label="FULL" value={d.drops.full} onChange={(v) => c.edit((x) => { x.drops.full = Math.min(80, v); })} />
             </div>
           ))}
+          {rule('Hold a seat when a player disconnects', 'Their turn waits this long for them to come back, then plays automatically', <Stepper label="reconnect grace" value={d.reconnectGraceSeconds ?? 45} min={0} max={180} step={15} suffix="s" onChange={(v) => c.edit((x) => { x.reconnectGraceSeconds = v; })} />)}
           {rule('Bots fill empty seats after', 'Seconds to wait for real players', <Stepper label="bot wait" value={d.botFillSeconds} min={0} max={120} step={1} suffix="s" onChange={(v) => c.edit((x) => { x.botFillSeconds = v; })} />)}
           {rule('Printed jokers in the deck', 'One per deck, used as wild cards', <Switch label="Printed jokers" on={d.printedJokers} onChange={(v) => c.edit((x) => { x.printedJokers = v; })} />)}
           {rule('Play with Friends tables', 'Players can create a private table and share a 4-digit code', <Switch label="Play with Friends tables" on={d.friendsTables} onChange={(v) => c.edit((x) => { x.friendsTables = v; })} />)}

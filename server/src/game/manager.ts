@@ -337,8 +337,16 @@ export function attachSockets(server: Server) {
       if (stillHere) return;
       const t = current();
       if (!t) return;
-      if (t.phase === 'waiting') await leaveWaiting(playerId, t).catch(() => {});
-      else t.setConnected(playerId, false); // turns time out and auto-play until they come back
+      t.setConnected(playerId, false);
+      if (t.phase === 'waiting') {
+        // hold their seat for the grace period; leave only if they don't come back
+        const graceMs = (getConfig().reconnectGraceSeconds ?? 45) * 1000;
+        setTimeout(async () => {
+          const back = (await io!.in(playerRoom(playerId)).fetchSockets()).length > 0;
+          if (!back && t.phase === 'waiting' && t.seatOf(playerId)) await leaveWaiting(playerId, t).catch(() => {});
+        }, graceMs);
+      }
+      // while playing: their turn waits for the grace period, then auto-plays until they return
     });
   });
 }

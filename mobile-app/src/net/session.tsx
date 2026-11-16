@@ -43,9 +43,13 @@ export interface Banner { id: number; title: string; subtitle: string; color: st
 export interface SeatView {
   idx: number; name: string; code: string; color: string; avatar?: string | null; photo?: string | null; isBot: boolean; cards: number;
   status: 'playing' | 'dropped' | 'invalid' | 'left'; lastThrown: Card | null; connected: boolean;
+  /** While disconnected: until when their seat is held (ms). */
+  reconnectUntil?: number | null;
 }
-export interface SeatResult { idx: number; name: string; code: string; color: string; avatar?: string | null; photo?: string | null; kind: 'human' | 'bot'; points: number; chips: number; won: boolean; status: string; melds?: Card[][] }
-export interface TableResult { winnerIdx: number | null; reason: string; seats: SeatResult[] }
+export interface SeatResult { idx: number; name: string; code: string; color: string; avatar?: string | null; photo?: string | null; kind: 'human' | 'bot'; points: number; chips: number; won: boolean; status: string; melds?: Card[][];
+  /** The player's whole hand at the end, grouped: melds, then leftover cards (type 'none'). */
+  groups?: { type: 'pure' | 'impure' | 'set' | 'none'; cards: Card[] }[] }
+export interface TableResult { winnerIdx: number | null; reason: string; seats: SeatResult[]; wild?: Card | null }
 export interface TableView {
   id: string; mode: ModeId; size: number; entry: number; phase: 'waiting' | 'playing' | 'ended'; you: number;
   /** Play with Friends: the code to share, and which seat is the host (-1 for public tables). */

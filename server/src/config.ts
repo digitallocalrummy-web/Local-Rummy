@@ -14,6 +14,8 @@ export const configSchema = z.object({
   modes: z.object({ points: modeSchema, pool: modeSchema, deals: modeSchema }),
   turnSeconds: z.number().int().min(10).max(120),
   autoDropAfter: z.number().int().min(1).max(10),
+  /** Seconds a disconnected player's seat is held (their turn waits) before auto-play. */
+  reconnectGraceSeconds: z.number().int().min(0).max(180).default(45),
   drops: z.object({ first: z.number().int().min(0).max(80), middle: z.number().int().min(0).max(80), full: z.number().int().min(0).max(80) }),
   printedJokers: z.boolean(),
   quickChat: z.boolean(),
@@ -37,6 +39,7 @@ export const defaultConfig: GameConfig = {
   },
   turnSeconds: 30,
   autoDropAfter: 3,
+  reconnectGraceSeconds: 45,
   drops: { first: 20, middle: 40, full: 80 },
   printedJokers: true,
   quickChat: true,

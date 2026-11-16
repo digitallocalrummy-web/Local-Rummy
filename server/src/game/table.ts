@@ -33,14 +33,18 @@ export interface Seat {
   dropPoints?: number;
   lastThrown?: Card;
   connected: boolean;
+  /** When this player's connection dropped (ms); cleared when they come back. */
+  awaySince?: number;
   escrow: number;
 }
 
 export interface SeatResult {
   idx: number; name: string; code: string; color: string; avatar?: string | null; photo?: string | null; kind: Seat['kind']; playerId?: string;
   points: number; chips: number; won: boolean; status: SeatStatus; melds?: Card[][];
+  /** Every card the player held at the end, grouped: melds first, then the cards left over. */
+  groups?: { type: 'pure' | 'impure' | 'set' | 'none'; cards: Card[] }[];
 }
-export interface TableResult { winnerIdx: number | null; reason: string; seats: SeatResult[] }
+export interface TableResult { winnerIdx: number | null; reason: string; seats: SeatResult[]; wild: Card | null }
 
 export type TableEvent =
   | { type: 'dealt'; order: number[]; perSeat: number }
@@ -202,12 +206,25 @@ export class Table {
     this.turn = idx;
     s.drawn = false;
     this.turnCount++;
-    this.deadline = this.solo ? null : Date.now() + this.cfg.turnSeconds * 1000;
+    // a player who just lost connection keeps their turn for the rest of the grace period
+    const ms = Math.max(this.cfg.turnSeconds * 1000, s.kind === 'human' && !s.connected ? this.graceLeft(s) : 0);
+    this.deadline = this.solo ? null : Date.now() + ms;
     this.hooks.onEvent(this, { type: 'turn', seat: idx, deadline: this.deadline });
     this.hooks.onChange(this);
     this.clearTurnTimer();
     if (s.kind === 'bot') this.later(550 + randomInt(0, 650), () => this.botPlay(idx));
-    else if (this.deadline) this.turnTimer = setTimeout(() => this.onTimeout(idx), this.cfg.turnSeconds * 1000 + 300);
+    else if (this.deadline) this.armTurnTimer(idx);
+  }
+
+  private armTurnTimer(idx: number) {
+    this.clearTurnTimer();
+    if (this.deadline) this.turnTimer = setTimeout(() => this.onTimeout(idx), Math.max(0, this.deadline - Date.now()) + 300);
+  }
+
+  /** Milliseconds left of a disconnected player's grace period. */
+  private graceLeft(s: Seat) {
+    if (s.connected || !s.awaySince) return 0;
+    return Math.max(0, (this.cfg.reconnectGraceSeconds ?? 45) * 1000 - (Date.now() - s.awaySince));
   }
 
   private nextTurn() {
@@ -334,7 +351,20 @@ export class Table {
 
   setConnected(playerId: string, on: boolean) {
     const s = this.seatOf(playerId);
-    if (s) { s.connected = on; this.hooks.onChange(this); }
+    if (!s || s.connected === on) { if (s) this.hooks.onChange(this); return; }
+    s.connected = on;
+    s.awaySince = on ? undefined : Date.now();
+    // their turn right now: hold it for the grace period, or back to a normal turn once they return
+    if (this.phase === 'playing' && this.turn === s.idx && this.deadline) {
+      const now = Date.now();
+      const next = on ? Math.min(this.deadline, now + this.cfg.turnSeconds * 1000) : Math.max(this.deadline, now + this.graceLeft(s));
+      if (next !== this.deadline) {
+        this.deadline = next;
+        this.hooks.onEvent(this, { type: 'turn', seat: s.idx, deadline: this.deadline });
+        this.armTurnTimer(s.idx);
+      }
+    }
+    this.hooks.onChange(this);
   }
 
   // ---------- bots ----------
@@ -363,20 +393,22 @@ export class Table {
       const won = s.idx === winnerIdx;
       let points = 0;
       let melds: Card[][] | undefined;
+      // show everyone's hand at the end, arranged the best way
+      const a = arrange(s.hand, this.wildRank);
+      const groups: SeatResult['groups'] = [
+        ...a.melds.map((m) => ({ type: m.type, cards: m.cards })),
+        ...(a.deadwood.length ? [{ type: 'none' as const, cards: sortHand(a.deadwood) }] : []),
+      ];
       if (!won) {
         if (s.dropPoints != null) points = s.dropPoints;
-        else {
-          const a = arrange(s.hand, this.wildRank);
-          points = a.points;
-          melds = a.melds.map((m) => m.cards);
-        }
-      } else melds = arrange(s.hand, this.wildRank).melds.map((m) => m.cards);
+        else { points = a.points; melds = a.melds.map((m) => m.cards); }
+      } else melds = a.melds.map((m) => m.cards);
       const pay = this.entry && reason !== 'cancelled' ? Math.min(this.entry, Math.round((points * this.entry) / 80)) : 0;
-      return { idx: s.idx, name: s.name, code: s.code, color: s.color, avatar: s.avatar ?? null, photo: s.photo ?? null, kind: s.kind, playerId: s.playerId, points, chips: -pay, won, status: s.status, melds };
+      return { idx: s.idx, name: s.name, code: s.code, color: s.color, avatar: s.avatar ?? null, photo: s.photo ?? null, kind: s.kind, playerId: s.playerId, points, chips: -pay, won, status: s.status, melds, groups };
     });
     const winnerSeat = seats.find((r) => r.won);
     if (winnerSeat) winnerSeat.chips = seats.reduce((sum, r) => sum + (r.won ? 0 : -r.chips), 0);
-    this.result = { winnerIdx, reason, seats };
+    this.result = { winnerIdx, reason, seats, wild: this.wild };
     this.hooks.onEvent(this, { type: 'ended', result: this.result });
     this.hooks.onChange(this);
     this.hooks.onEnd(this, this.result);
@@ -417,6 +449,8 @@ export class Table {
       seats: this.seats.map((s) => ({
         idx: s.idx, name: s.name, code: s.code, color: s.color, avatar: s.avatar ?? null, photo: s.photo ?? null, isBot: s.kind === 'bot',
         cards: s.hand.length, status: s.status, lastThrown: s.lastThrown ?? null, connected: s.connected,
+        /** While disconnected: until when their seat is held (ms). */
+        reconnectUntil: s.connected || !s.awaySince ? null : s.awaySince + (this.cfg.reconnectGraceSeconds ?? 45) * 1000,
       })),
       open: this.pile[this.pile.length - 1] ?? null,
       recent: this.pile.slice(-4).map((p) => ({ card: p.card, by: p.by })),

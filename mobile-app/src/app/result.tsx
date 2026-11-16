@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useStage } from '../game/Stage';
+import type { Card } from '../types';
+import { MiniCard, useStage } from '../game/Stage';
 import Animated, {
   Easing,
   FadeIn,
@@ -56,7 +57,7 @@ export default function Result() {
   const resultRows = (result?.seats ?? [])
     .slice()
     .sort((a, b) => Number(b.won) - Number(a.won) || a.points - b.points)
-    .map((r) => ({ player: { id: String(r.idx), name: r.name, initials: r.code || initialsOf(r.name), color: r.color, chips: 0, avatar: r.avatar ?? null, photo: photoUri(r.photo) }, points: r.points, chips: r.chips, isYou: r.idx === you }));
+    .map((r) => ({ player: { id: String(r.idx), name: r.name, initials: r.code || initialsOf(r.name), color: r.color, chips: 0, avatar: r.avatar ?? null, photo: photoUri(r.photo) }, points: r.points, chips: r.chips, isYou: r.idx === you, groups: r.groups ?? [], status: r.status }));
   const mine = result?.seats.find((r) => r.idx === you);
   const small = resultRows.length > 5;
   const resultStats = [
@@ -132,9 +133,10 @@ export default function Result() {
       >
         <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16 * s, paddingVertical: 12 * s, gap: 4 * s }} showsVerticalScrollIndicator={false}>
           <View style={[styles.row, { paddingHorizontal: 8 * s, paddingBottom: 4 * s }]}>
-            <Text style={[styles.th, { flex: 1.6, fontSize: 9 * s }]}>PLAYER</Text>
-            <Text style={[styles.th, { flex: 0.8, fontSize: 9 * s }]}>POINTS</Text>
-            <Text style={[styles.th, { flex: 1, fontSize: 9 * s, textAlign: 'right' }]}>CHIPS</Text>
+            <Text style={[styles.th, { width: 112 * s, fontSize: 9 * s }]}>PLAYER</Text>
+            <Text style={[styles.th, { flex: 1, fontSize: 9 * s }]}>CARDS AT THE END</Text>
+            <Text style={[styles.th, { width: 40 * s, fontSize: 9 * s, textAlign: 'right' }]}>PTS</Text>
+            <Text style={[styles.th, { width: 58 * s, fontSize: 9 * s, textAlign: 'right' }]}>CHIPS</Text>
           </View>
           {resultRows.map((r, i) => (
             <Animated.View
@@ -142,24 +144,25 @@ export default function Result() {
               entering={FadeInRight.delay(400 + i * 90).springify().damping(18)}
               accessible
               accessibilityLabel={`${r.player.name}, ${r.points} points, ${r.chips > 0 ? 'won' : 'lost'} ${formatChips(Math.abs(r.chips))} chips`}
-              style={[styles.row, { height: (small ? 28 : 38) * s, paddingHorizontal: 8 * s, borderRadius: 10 * s, backgroundColor: r.isYou ? 'rgba(232,198,106,0.16)' : 'rgba(255,255,255,0.04)' }]}
+              style={[styles.row, { height: (small ? 32 : 40) * s, paddingHorizontal: 8 * s, borderRadius: 10 * s, backgroundColor: r.isYou ? 'rgba(232,198,106,0.16)' : 'rgba(255,255,255,0.04)' }]}
             >
-              <View style={{ flex: 1.6, flexDirection: 'row', alignItems: 'center', gap: 8 * s }}>
+              <View style={{ width: 112 * s, flexDirection: 'row', alignItems: 'center', gap: 6 * s }}>
                 <PlayerAvatar player={r.player} size={(small ? 22 : 28) * s} />
                 <Text numberOfLines={1} style={{ flexShrink: 1, fontFamily: fonts.uiBold, fontSize: (small ? 12 : 13) * s, color: colors.textWhite }}>
                   {r.player.name}
                   {r.isYou ? ' (You)' : ''}
                 </Text>
               </View>
-              <Text style={{ flex: 0.8, fontFamily: fonts.uiBold, fontSize: 13 * s, color: '#DCE9E0' }}>{r.points}</Text>
-              <Text style={{ flex: 1, textAlign: 'right', fontFamily: fonts.uiHeavy, fontSize: 13 * s, color: r.chips > 0 ? colors.goldBright : r.chips < 0 ? colors.loss : '#DCE9E0' }}>
+              <HandStrip groups={r.groups} wildRank={result?.wild?.rank ?? null} w={(small ? 15 : 19) * s} dropped={r.status === 'dropped'} s={s} />
+              <Text style={{ width: 40 * s, textAlign: 'right', fontFamily: fonts.uiBold, fontSize: 13 * s, color: '#DCE9E0' }}>{r.points}</Text>
+              <Text style={{ width: 58 * s, textAlign: 'right', fontFamily: fonts.uiHeavy, fontSize: 13 * s, color: r.chips > 0 ? colors.goldBright : r.chips < 0 ? colors.loss : '#DCE9E0' }}>
                 {r.chips > 0 ? '+' : r.chips < 0 ? '−' : ''}
                 {formatChips(Math.abs(r.chips))}
               </Text>
             </Animated.View>
           ))}
         </ScrollView>
-        <View style={{ width: 170 * s, borderLeftWidth: 1, borderLeftColor: 'rgba(232,198,106,0.2)', padding: 14 * s, paddingHorizontal: 16 * s, gap: 10 * s }}>
+        <View style={{ width: 132 * s, borderLeftWidth: 1, borderLeftColor: 'rgba(232,198,106,0.2)', padding: 14 * s, paddingHorizontal: 16 * s, gap: 10 * s }}>
           <Text style={[styles.th, { fontSize: 9 * s }]}>GAME STATS</Text>
           {resultStats.map((st) => (
             <View key={st.label}>
@@ -178,6 +181,27 @@ export default function Result() {
           router.replace(r.ok ? '/game' : '/lobby');
         }} />
       </Animated.View>
+    </View>
+  );
+}
+
+/** A player's final cards, in their groups: green underline = pure sequence, blue = sequence/set, none = leftover. */
+function HandStrip({ groups, wildRank, w, dropped, s }: { groups: { type: string; cards: Card[] }[]; wildRank: string | null; w: number; dropped: boolean; s: number }) {
+  if (!groups.length) return <View style={{ flex: 1 }} />;
+  const step = w * 0.62;
+  const tone = (t: string) => (t === 'pure' ? '#3FCB7E' : t === 'none' ? 'transparent' : '#6FA8FF');
+  return (
+    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 4 * s, opacity: dropped ? 0.55 : 1, overflow: 'hidden' }}
+      accessibilityLabel={groups.map((g) => `${g.type === 'pure' ? 'pure sequence' : g.type === 'impure' ? 'sequence' : g.type === 'set' ? 'set' : 'leftover'}: ${g.cards.map((c) => (c.rank === 'JK' ? 'joker' : `${c.rank}${c.suit}`)).join(' ')}`).join('; ')}>
+      {groups.map((g, gi) => (
+        <View key={gi} style={{ flexDirection: 'row', paddingBottom: 2 * s, borderBottomWidth: 2 * s, borderBottomColor: tone(g.type) }}>
+          {g.cards.map((c, i) => (
+            <View key={c.id} style={{ marginLeft: i ? step - w : 0, borderRadius: w * 0.16, borderWidth: c.rank === 'JK' || c.rank === wildRank ? 1.5 : 0, borderColor: colors.gold }}>
+              <MiniCard card={c} w={w} />
+            </View>
+          ))}
+        </View>
+      ))}
     </View>
   );
 }

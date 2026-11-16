@@ -2,7 +2,7 @@
  * Hand helpers for the table: smart grouping into melds, a label for each group,
  * and the points still left in the hand. Kept cheap: one `arrange` call per hand.
  */
-import { arrange, cardPoints, classifyGroup, scoreArrangement, sortHand, type Card as RCard, type Rank } from '@local-rummy/rummy';
+import { arrange, cardPoints, checkDeclaration, classifyGroup, scoreArrangement, sortHand, type Card as RCard, type Rank } from '@local-rummy/rummy';
 import type { Card } from '../types';
 
 const NODE_LIMIT = 2500; // plenty for 13–14 cards; keeps phones smooth
@@ -50,4 +50,29 @@ export function pointsLeft(hand: Card[], wildRank: string | null): number {
   let worst = 0;
   r.deadwood.forEach((c, i) => { if (cardPoints(c, w) > cardPoints(r.deadwood[worst], w)) worst = i; });
   return scoreArrangement(r.melds, r.deadwood.filter((_, i) => i !== worst), w);
+}
+
+const SUIT: Record<string, string> = { S: 'Spades', H: 'Hearts', D: 'Diamonds', C: 'Clubs' };
+const short = (c: Card) => (c.rank === 'JK' ? 'the Joker' : `${c.rank} of ${SUIT[c.suit] ?? c.suit}`);
+
+/**
+ * Before declaring (14 cards): with one card selected, check the other 13; with none selected,
+ * look for the card to throw that would make a valid show.
+ */
+export function declareAdvice(hand: Card[], selected: string[], wildRank: string | null): { ok: boolean; text: string } {
+  const w = (wildRank ?? null) as Rank | null;
+  if (selected.length === 1) {
+    const thrown = hand.find((c) => c.id === selected[0]);
+    const rest = hand.filter((c) => c.id !== selected[0]) as unknown as RCard[];
+    const r = checkDeclaration(rest, w);
+    return r.valid ? { ok: true, text: `Throw ${thrown ? short(thrown) : 'it'} and declare.` } : { ok: false, text: r.reason ?? 'These 13 cards are not valid yet.' };
+  }
+  const a = arrange(hand as unknown as RCard[], w, NODE_LIMIT);
+  if (a.deadwood.length === 1) {
+    const rest = (hand as unknown as RCard[]).filter((c) => c.id !== a.deadwood[0].id);
+    if (checkDeclaration(rest, w).valid) return { ok: true, text: `Select ${short(a.deadwood[0] as unknown as Card)}, then Declare.` };
+  }
+  const pure = a.melds.filter((m) => m.type === 'pure').length;
+  const seqs = a.melds.filter((m) => m.type !== 'set').length;
+  return { ok: false, text: pure === 0 ? 'Make a pure sequence first.' : seqs < 2 ? 'You need a second sequence.' : `${a.deadwood.length} cards are not in a group yet.` };
 }
